@@ -334,20 +334,27 @@ function UuidTool() {
 function HashTool() {
   const [input, setInput] = useState("");
   const [hashes, setHashes] = useState<{ algo: string; value: string }[]>([]);
+  const [error, setError] = useState("");
 
   async function compute() {
-    const data = new TextEncoder().encode(input);
-    const results: { algo: string; value: string }[] = [
-      { algo: "MD5", value: md5(input) },
-    ];
-    for (const algo of ["SHA-1", "SHA-256", "SHA-512"] as const) {
-      const buf = await crypto.subtle.digest(algo, data);
-      const hexStr = [...new Uint8Array(buf)]
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-      results.push({ algo, value: hexStr });
+    setError("");
+    try {
+      const data = new TextEncoder().encode(input);
+      const results: { algo: string; value: string }[] = [
+        { algo: "MD5", value: md5(input) },
+      ];
+      for (const algo of ["SHA-1", "SHA-256", "SHA-512"] as const) {
+        const buf = await crypto.subtle.digest(algo, data);
+        const hexStr = [...new Uint8Array(buf)]
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        results.push({ algo, value: hexStr });
+      }
+      setHashes(results);
+    } catch (e) {
+      setHashes([]);
+      setError(`SHA 计算不可用：${String(e)}`);
     }
-    setHashes(results);
   }
 
   return (
@@ -378,10 +385,12 @@ function HashTool() {
           onClick={() => {
             setInput("");
             setHashes([]);
+            setError("");
           }}
         >
           清空
         </button>
+        {error && <span className="hint hint-error">{error}</span>}
       </div>
       {hashes.map((h) => (
         <div className="kv-row" key={h.algo}>

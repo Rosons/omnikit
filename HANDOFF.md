@@ -105,6 +105,10 @@ devtoolbox/
   - 前端 `src/tools/history/History.tsx`:类型徽标(加密蓝/解密绿)+ 名称/位置双行 + 时间 + 内容统计 + 打开/删除,二次确认式清空;工具在 `registry.tsx` 注册为 `filemgr`
 - placeholder 统一:`.input::placeholder` 强制正文字体(输出位置输入框是等宽字体,之前 placeholder 跟随导致与密码框不一致)
 - 全角标点:29 处用户可见中文文案的半角 `,:` 改全角(含 Rust 错误消息)
+- **加解密可取消**:pack/unpack 加 `should_stop` 闭包(块间检查);`AppState.cancel_slot` 槽位(Arc<AtomicBool>,ptr_eq 防误清)+ `sb_cancel` 命令;解密取消会删除已解出的半成品文件;打包取消删除 .part
+- **页面联动**:`src/lib/bus.ts`(requestDecrypt/peekDecryptPrefill 版本戳防重放),文件管理加密记录点「解密」→ 切到保险箱预填 .box 路径
+- **第三个工具「开发小工具」**(registry id `devtools`):JSON 格式化/压缩、时间戳双向转换(10/13 位自动识别)、Base64/URL 编解码(UTF-8 安全)、UUID v4 批量生成、哈希(MD5 纯 JS 实现 + SHA-1/256/512 WebCrypto);MD5 实现已过标准向量验证
+- 项目已 git 化(2026-09-18 首次提交),历史性能基准:`cargo test --release bench_throughput -- --ignored --nocapture`(1MiB vs 16MiB 块实测无差异,瓶颈在磁盘)
 
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)

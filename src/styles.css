@@ -249,6 +249,7 @@ body {
   font-weight: 500;
   color: var(--text-2);
 }
+.field-label .hint { margin-left: 10px; font-weight: 400; }
 
 .input {
   height: 36px;
@@ -318,6 +319,8 @@ body {
   border-radius: var(--radius-m);
   margin-bottom: var(--sp-4);
 }
+/* 子页 Tab 放在弹性列容器里时不被拉伸成整行 */
+.seg.seg-sm { align-self: flex-start; margin-bottom: var(--sp-4); }
 
 .seg-btn {
   padding: 6px 20px;

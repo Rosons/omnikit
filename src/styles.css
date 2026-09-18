@@ -890,6 +890,8 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
 }
+/* 端口进程详情弹窗:更宽以容纳完整路径 */
+.port-modal { width: 560px; }
 @keyframes modal-in {
   from { opacity: 0; transform: scale(0.94) translateY(8px); }
   to { opacity: 1; transform: none; }
@@ -1106,15 +1108,21 @@ body {
 .diff-marker.add { background: var(--success); }
 
 /* ===== 端口占用 ===== */
-/* 整页撑满视口剩余高度,列表区域自适应拉伸 */
+/* 页面直接继承内容区高度,列表区弹性拉伸占满 */
 .port-page {
-  height: calc(100vh - 245px);
+  height: 100%;
   min-height: 320px;
+}
+.port-table {
+  flex: 1;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
 }
 .port-head,
 .port-row {
   display: grid;
-  grid-template-columns: 56px 1fr 90px 210px 60px;
+  grid-template-columns: 56px 1fr 90px 210px 104px;
   gap: var(--sp-3);
   padding: 0 var(--sp-4);
   align-items: center;
@@ -1130,7 +1138,7 @@ body {
 }
 .port-list {
   flex: 1;
-  min-height: 220px;
+  min-height: 0;
   border: 1px solid var(--border);
   border-radius: 0 0 var(--radius-m) var(--radius-m);
   background: var(--card);
@@ -1140,18 +1148,11 @@ body {
   height: 42px;
   border-bottom: 1px solid var(--border);
   font-size: 13px;
-  cursor: pointer;
 }
 .port-row:hover { background: var(--fill); }
-.port-row.open { background: var(--primary-dim); }
 .port-row:last-child { border-bottom: none; }
-.port-detail {
-  grid-column: 1 / -1;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-m);
-  background: var(--fill);
-  margin: 2px 0 8px;
-}
+.port-actions { display: flex; gap: 2px; }
+.port-more:hover { color: var(--primary); background: var(--primary-dim); }
 .kv-mono {
   font-family: Consolas, "Cascadia Mono", monospace;
   font-size: 12px;

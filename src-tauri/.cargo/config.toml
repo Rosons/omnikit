@@ -1,0 +1,3 @@
+# 构建产物体积大，统一放到 E 盘，避免撑爆 C 盘
+[build]
+target-dir = "E:\\DevEnv\\targets\\devtoolbox"

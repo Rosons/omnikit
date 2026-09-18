@@ -1,0 +1,168 @@
+# DevToolbox 项目交接文档
+
+> 用途:在新会话中继续开发。本文档自包含全部上下文,无需原会话历史。
+> 更新时间:2026-09-18(**v0.1.0 已完成并出包**,见第四节末尾「当前状态」)
+
+## 一、项目是什么
+
+**开发者个人工具箱（桌面应用）**，可插拔架构：侧边栏 + 工具注册表，后续新工具持续接入。
+
+**第一个工具：「文件保险箱」**——把任意文件/文件夹批量加密成一个 `.box` 文件、输入密码解密还原。全程本地（AES-256-GCM + Argon2id）。
+
+### 用户需求原话（约束）
+1. 必须支持**文件夹和文件**（批量、递归）
+2. **后续其他工具可以继续接入**这个桌面 app（所以骨架必须是注册表式插件架构）
+3. Rust 环境安装在 **E 盘统一目录 `E:\DevEnv`** 下（用户 C 盘只剩 ~29G，不许撑爆）
+4. 用户已授予完全权限，**不要反复询问**，直接干活
+5. 用户目的："手痒想做"——小而快出成果，避免大而全
+
+### 已否决的方向（不要再提）
+- 在线工具箱类合集（用户认为红海，在线工具已覆盖）
+- 本地知识库全文搜索（用户不需要，AI 时代用不上）
+- RAG 知识库问答（现成产品 Cherry Studio/AnythingLLM 等太完善）
+- LLM 用量统计/接口网关（需在每个 AI 应用里改 API 地址接入，用户嫌配置多，2026-09-18 否决；全局 MITM 抓取方案因要改系统代理+装根证书且抓不全，也不要再提）
+
+## 二、技术栈与关键决策
+
+- **Tauri 2 + React 19 + TypeScript + Vite 6**（前端）/ **Rust stable**（后端）
+- cargo crates 走 **rsproxy 镜像**（已配置）；npm 已是 npmmirror
+- 应用名 `DevToolbox`，identifier `com.devtoolbox.desktop`，项目路径：
+  `E:\projects\ai-projects\devtoolbox`
+- 构建产物重定向：`src-tauri/.cargo/config.toml` → `E:\DevEnv\targets\devtoolbox`（保护 C 盘）
+- 打包目标：NSIS（注意：首次 `tauri build` 会从 GitHub 下载 NSIS 工具，国内可能慢/失败；失败则改 bundle targets 为 `[]` 只出裸 exe）
+
+## 三、环境状态（全部已装好，勿重装）
+
+| 组件 | 位置/版本 | 备注 |
+|---|---|---|
+| Node / npm | v24.19.0 / 11.17.0 | registry=npmmirror |
+| Rust | 1.98.1 stable-msvc | `RUSTUP_HOME=E:\DevEnv\rustup`，`CARGO_HOME=E:\DevEnv\cargo`，**装时用了 --no-modify-path，不在 PATH 里** |
+| cargo 镜像 | `E:\DevEnv\cargo\config.toml` | rsproxy-sparse 已配置 |
+| VS Build Tools 2022 | `E:\DevEnv\BuildTools` | MSVC 14.44.35207 + Win SDK 10.0.26100.0，vswhere 可检测到 |
+| WebView2 运行时 | 153.0.4234.32 | 已存在 ✓ |
+
+**每次新 Bash 调用都要先导出（shell 状态不跨调用保留）：**
+
+```bash
+export PATH="/e/DevEnv/cargo/bin:$PATH"
+export RUSTUP_HOME='E:\DevEnv\rustup'
+export CARGO_HOME='E:\DevEnv\cargo'
+```
+
+## 四、已完成的工作
+
+### 已写入的文件（完整，无需重写）
+```
+devtoolbox/
+├── package.json                  # react19/@tauri-apps/api2/plugin-dialog2/vite6/ts5，scripts: dev/build/tauri
+├── tsconfig.json                 # strict、noEmit、react-jsx、moduleResolution bundler
+├── vite.config.ts                # port 1420 strictPort、clearScreen false
+├── index.html                    # zh-CN，#root
+├── .gitignore
+└── src-tauri/
+    ├── Cargo.toml                # 依赖：tauri2、tauri-plugin-dialog 2、serde/serde_json、
+    │                             #   aes-gcm 0.10、argon2 0.5、rand 0.8、walkdir 2、zeroize 1
+    │                             #   [lib] name="devtoolbox_lib" crate-type=["rlib"]
+    │                             #   release: lto+strip+opt-level=s
+    ├── build.rs                  # tauri_build::build()
+    ├── tauri.conf.json           # 窗口 1000x660 min860x560、dragDropEnabled、bundle nsis、
+    │                             #   icons 引用 icon.ico/32x32/128x128/128x128@2x
+    ├── .cargo/config.toml        # target-dir → E:\DevEnv\targets\devtoolbox
+    └── capabilities/default.json # permissions: core:default, dialog:default
+```
+
+### 尚未创建(新会话的任务清单)
+> ✅ 以下全部已于 2026-09-18 完成。
+
+1. ~~Rust 源码~~ ✅(另加了 `error.rs` 错误模块;`unpack` 复用 `pack::Progress`;registry 因含 JSX 图标为 `registry.tsx`)
+2. ~~应用图标~~ ✅ `scripts/make-icon.mjs`(纯 Node zlib 手绘)→ `npx tauri icon` 全套已生成
+3. ~~前端~~ ✅(已按 `ui-design-system` 技能流程实现:深海军蓝×琥珀金、8pt 网格、系统字体栈)
+4. ~~npm install~~ ✅
+5. ~~cargo test~~ ✅ 3/3 通过(round-trip 含嵌套/空文件/非 1MiB 整数倍/错密码/冲突拒绝覆盖/非 .box 识别)
+6. ~~npx tauri build~~ ✅ NSIS 下载成功,产物:
+   - 裸 exe:`E:\DevEnv\targets\devtoolbox\release\devtoolbox.exe`(3.3 MB)
+   - 安装包:`E:\DevEnv\targets\devtoolbox\release\bundle\nsis\DevToolbox_0.1.0_x64-setup.exe`(1.2 MB)
+
+### 实现偏差备忘(与原设计的差异)
+- **meta_len 是明文 JSON 字节数**:磁盘上 meta 密文 = meta_len + 16B tag;unpack 须读 `meta_len+16` 字节,数据区起点 = `71 + meta_len + 16`(踩过的坑)
+- pack 读取文件用 `read_exact` 严格按 1MiB 切块(与 unpack 的切块对齐,不能依赖 read 返回值)
+- pack 结束先写 `<output>.part`,rename 前若 output 已存在则先删(Windows rename 不能覆盖)
+- 进度 emit 在 commands 层做 100ms 节流;密码用 `Zeroizing<String>` 包裹
+- 项目已从 `C:\Users\31288\.zcode\workspace\default\devtoolbox` 迁移到 **`E:\projects\ai-projects\devtoolbox`**
+
+### v0.1.1 UI 改版(2026-09-18,用户反馈"AI 风格太重、布局丑")
+- **整体换浅色网盘风**(百度网盘式清爽):白卡片 + 蓝主色 `#06A7FF`、1px 边框、扁平无渐变发光;`src/styles.css` 全量重写
+- **新增 `sb_scan` 命令**(commands.rs,复用 pack::collect_files):选文件夹后前端展示完整文件清单表格(文件名+按扩展名着色的类型徽标+大小+合计),`--` 前端 `addItems` 追加去重
+- 进度改"传输任务"卡片:百分比、字节、前端估算速度、当前文件
+- **选取去重规则**(pack.rs `collect_files`,pack 与 sb_scan 共用):① 输入位于已保留输入内部(或重复)时整项跳过(父吞子,浅层优先);② 顶层同名冲突自动加 " (n)" 后缀(文件插在扩展名前);`sb_scan` 返回 `skippedInputs`/`renamedInputs`,前端表格上方展示提示
+- 应用图标同步改版:**品牌图形是"工具箱"**(蓝色渐变圆角底 + 白色箱子),锁图标只属于文件保险箱单个工具(`scripts/make-icon.mjs` 已更新,重新 `tauri icon` 全套)
+- 结果态改横条式(图标+统计+操作按钮),更紧凑
+- 大文件夹扫描加 loading(表格内 spinner + `scanSeqRef` 序号防竞态;`clearAll` 作废进行中的扫描)
+- 文案产品化:删掉算法参数 badges、"密码错误会立即提示"等讨论式说明;仅保留"密码丢失后无法找回"和"本地处理,数据不出设备"两条关键信息
+- **新增「文件管理」工具**(v0.1.0 第二个工具,验证了插件架构):
+  - 后端 `history.rs`:记录存 `%APPDATA%\com.devtoolbox.desktop\history.json`(tmp+rename 原子写,上限 200 条);`sb_encrypt/sb_decrypt` 成功后自动记录(kind/name/boxPath/location/files/bytes/time),失败静默不影响主流程
+  - 命令:`sb_history_list / sb_history_remove / sb_history_clear`
+  - 前端 `src/tools/history/History.tsx`:类型徽标(加密蓝/解密绿)+ 名称/位置双行 + 时间 + 内容统计 + 打开/删除,二次确认式清空;工具在 `registry.tsx` 注册为 `filemgr`
+- placeholder 统一:`.input::placeholder` 强制正文字体(输出位置输入框是等宽字体,之前 placeholder 跟随导致与密码框不一致)
+- 全角标点:29 处用户可见中文文案的半角 `,:` 改全角(含 Rust 错误消息)
+
+### 剩余手动验收(需真人操作)
+拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)
+
+## 五、加密引擎设计规格（照此实现，不要改协议）
+
+### .box 容器格式 v1
+```
+偏移  大小  字段
+0     8    MAGIC = b"DBOXv001"
+8     16   argon2 salt（随机）
+24    4    m_kib  u32 LE = 65536（64 MiB）
+28    4    t      u32 LE = 3
+32    4    p      u32 LE = 1
+36    4    nonce_prefix（随机 4 字节）
+40    27   verify 块密文 = 11B 明文 b"DBOX-VERIFY" + 16B GCM tag
+67    4    meta_len u32 LE（明文 JSON 字节数，≤512MB 校验）
+71    N    meta 密文 = JSON + 16B tag
+...        数据区：逐文件逐 chunk，每块 = 密文(明文+16B tag)，明文 chunk = 1 MiB（每文件最后一块可短）
+```
+- **Nonce**：`nonce_prefix(4B) || counter(u64 LE)`；counter 分配：meta=0，verify=1，数据块从 2 起全局递增
+- **AAD**（每块必绑）：`MAGIC || kind_tag || file_index(u32 LE) || chunk_index(u32 LE)`，kind_tag：meta=`b"meta"`、verify=`b"vrfy"`、data=`b"data"`
+- **元数据 JSON**：`{"v":1,"created_at":unix秒,"files":[{"path":"相对路径(正斜杠)","size":字节数}]}`
+- 密钥：Argon2id(password, salt, m=65536KiB, t=3, p=1) → 32 字节 AES-256 key
+- **pack**：walkdir 递归收集（排序、相对路径用 `/`、去重）；先写 `<output>.part` 全部完成后再 rename 成 `.box`；进度按 chunk 上报
+- **unpack**：先解 verify 块校验密码（错密码快速失败）；路径清洗防 zip-slip（拒绝绝对路径、`..`、非 Normal 组件）；解密前先预检输出目录冲突（存在同名文件则整体报错不覆盖）；解完后读 1 字节须 EOF（防截断/损坏）
+- 密码用完 `zeroize`
+
+### Rust 模块划分（src-tauri/src/）
+- `main.rs`：`windows_subsystem` attr + 调 `devtoolbox_lib::run()`
+- `lib.rs`：Builder + `.plugin(tauri_plugin_dialog::init())` + `generate_handler![sb_encrypt, sb_decrypt, sb_reveal]`
+- `crypto.rs`：derive_key / encrypt_piece / decrypt_piece / make_nonce / PieceKind / build_aad
+- `format.rs`：MAGIC、CHUNK_SIZE=1MiB、header 偏移常量、BoxMeta/MetaFile(serde)
+- `pack.rs`：`pack(inputs,&password,output,progress: impl Fn(Progress))`——核心函数收进度闭包，方便单测传 no-op
+- `unpack.rs`：`unpack(box_path,&password,out_dir,progress)` 同上
+- `commands.rs`：`sb_encrypt(paths, password, output)` / `sb_decrypt(box_path, password, output_dir)` / `sb_reveal(path)`（explorer /select）；重活丢 `tauri::async_runtime::spawn_blocking`，AppHandle clone 进闭包 emit 进度；返回 `SbSummary{output,files,bytes,elapsed_ms}`
+- 进度事件：`app.emit("safebox://progress", {phase:"pack"|"unpack", current_file, files_done, files_total, bytes_done, bytes_total})`（v2 记得 `use tauri::Emitter;`）
+
+### 前端架构（可插拔核心）
+- `src/tools/registry.ts`：`ToolModule { id, name, desc, icon, component(lazy) }` + `tools` 数组——**未来工具只需在这里注册**
+- `src/App.tsx`：侧边栏（工具列表）+ 主区渲染当前工具
+- 第一个工具 `src/tools/safebox/`：加密/解密两个 Tab；拖拽（`getCurrentWebview().onDragDropEvent` 的 drop 事件拿 `payload.paths`）+ 对话框选择（`@tauri-apps/plugin-dialog` 的 `save`/`open`）；密码+确认密码；进度条监听事件；完成态「打开所在文件夹」（invoke sb_reveal）+ 重置
+- `listen` 来自 `@tauri-apps/api/event`，`invoke` 来自 `@tauri-apps/api/core`
+
+## 六、推荐执行顺序
+
+```bash
+cd /e/projects/ai-projects/devtoolbox
+export PATH="/e/DevEnv/cargo/bin:$PATH"; export RUSTUP_HOME='E:\DevEnv\rustup'; export CARGO_HOME='E:\DevEnv\cargo'
+npm install                                  # npmmirror，快
+node scripts/make-icon.mjs && npx tauri icon assets/icon.png -o src-tauri/icons
+cargo test                                   # 首次拉取+编译全部依赖（rsproxy），约 5-15 分钟
+# → 写前端（先触发 ui-design-system 技能）
+npx tauri build                              # 首次会下载 NSIS，失败就把 bundle.targets 改 []
+```
+
+## 七、验收标准
+
+1. `cargo test`：加密→解密 round-trip 通过（含子文件夹嵌套、空文件、非 1MiB 整数倍文件、错密码报错）
+2. `npx tauri build` 成功产出 exe/NSIS 安装包
+3. 手动验证：拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致

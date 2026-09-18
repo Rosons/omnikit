@@ -488,7 +488,7 @@ pub async fn sb_hash_file(
         }
     }
     joined
-        .map_err(|e| format!("任务执行失败:{e}"))?
+        .map_err(|e| format!("任务执行失败：{e}"))?
         .map_err(|e: Error| e.to_string())
 }
 

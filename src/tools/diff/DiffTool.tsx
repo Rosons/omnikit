@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { diffChars, diffLines, diffWords } from "diff";
+import { diffArrays, diffChars, diffWords } from "diff";
 import { showToast } from "../../components/Toast";
 
 interface Seg {
@@ -32,6 +32,58 @@ type Item = { kind: "pair"; p: Pair } | { kind: "fold"; id: number; count: numbe
 const MAX_CHARS = 2_000_000;
 const FOLD_MIN = 10;
 const FOLD_KEEP = 3;
+
+interface DiffOpts {
+  ignoreCR: boolean;
+  ignoreBlank: boolean;
+  ignoreSpace: boolean;
+  ignoreAllSpace: boolean;
+  ignoreCase: boolean;
+}
+const DEFAULT_OPTS: DiffOpts = {
+  ignoreCR: true,
+  ignoreBlank: false,
+  ignoreSpace: false,
+  ignoreAllSpace: false,
+  ignoreCase: false,
+};
+const OPT_DEFS: { key: keyof DiffOpts; label: string }[] = [
+  { key: "ignoreCR", label: "忽略换行符差异（CR/LF）" },
+  { key: "ignoreBlank", label: "忽略空行" },
+  { key: "ignoreSpace", label: "忽略行首尾空白" },
+  { key: "ignoreAllSpace", label: "忽略空白字符" },
+  { key: "ignoreCase", label: "忽略大小写" },
+];
+
+/** 参与比较的一行:no=文件里的原始行号(含被忽略的行,保证行号可对照原文件) */
+interface LineItem {
+  no: number;
+  text: string;
+  key: string;
+}
+
+function toLines(text: string, o: DiffOpts): LineItem[] {
+  // 带分隔符切行,才能按需把 CR/LF 差异算进比较
+  const parts = text.split(/(\r\n|\r|\n)/);
+  const items: LineItem[] = [];
+  for (let i = 0; i < parts.length; i += 2) {
+    const t = parts[i];
+    if (i === parts.length - 1 && t === "") break; // 结尾换行符,不是空行
+    let key = t;
+    if (!o.ignoreCR) {
+      const eol = parts[i + 1] || "";
+      key += eol === "\r\n" ? "\x01" : eol === "\r" ? "\x02" : eol === "\n" ? "\x03" : "";
+    }
+    if (o.ignoreAllSpace) key = key.replace(/\s+/g, "");
+    else if (o.ignoreSpace) key = key.trim();
+    if (o.ignoreCase) key = key.toLowerCase();
+    items.push({ no: items.length + 1, text: t, key });
+  }
+  if (o.ignoreBlank) {
+    return items.filter((it) => (o.ignoreAllSpace ? it.text.trim() !== "" : it.text !== ""));
+  }
+  return items;
+}
 
 const TEXT_FILTERS = [
   {
@@ -88,6 +140,7 @@ export default function DiffTool() {
   const [mode, setMode] = useState<"edit" | "diff">("edit");
   const [blocks, setBlocks] = useState<Block[] | null>(null);
   const [stats, setStats] = useState({ add: 0, del: 0 });
+  const [opts, setOpts] = useState<DiffOpts>(DEFAULT_OPTS);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [groups, setGroups] = useState(0);
   const [chgPos, setChgPos] = useState(-1);
@@ -101,21 +154,17 @@ export default function DiffTool() {
       showToast("文本超过 2MB，请截取片段后比较", "error", 5000);
       return;
     }
-    const split = (v: string) => {
-      const ls = v.split("\n");
-      if (ls.length && ls[ls.length - 1] === "") ls.pop();
-      return ls;
-    };
+    const L = toLines(left, opts);
+    const R = toLines(right, opts);
+    const changes = diffArrays(L, R, { comparator: (a, b) => a.key === b.key });
     const flat: Pair[] = [];
     let key = 0;
-    let oldNo = 0;
-    let newNo = 0;
     let add = 0;
     let del = 0;
     let g = -1;
     let inChange = false;
-    let dels: string[] = [];
-    let adds: string[] = [];
+    let dels: LineItem[] = [];
+    let adds: LineItem[] = [];
     const flush = () => {
       add += adds.length;
       del += dels.length;
@@ -128,11 +177,11 @@ export default function DiffTool() {
           gStart = true;
         }
         const l: Cell | null =
-          i < dels.length ? { no: ++oldNo, text: dels[i], type: "del" } : null;
+          i < dels.length ? { no: dels[i].no, text: dels[i].text, type: "del" } : null;
         const r: Cell | null =
-          i < adds.length ? { no: ++newNo, text: adds[i], type: "add" } : null;
+          i < adds.length ? { no: adds[i].no, text: adds[i].text, type: "add" } : null;
         if (l && r) {
-          const segs = intraSegs(dels[i], adds[i]);
+          const segs = intraSegs(dels[i].text, adds[i].text);
           if (segs) {
             l.segs = segs[0];
             r.segs = segs[1];
@@ -150,18 +199,16 @@ export default function DiffTool() {
       dels = [];
       adds = [];
     };
-    for (const ch of diffLines(left, right)) {
-      if (ch.added) adds.push(...split(ch.value));
-      else if (ch.removed) dels.push(...split(ch.value));
+    for (const ch of changes) {
+      if (ch.added) adds.push(...ch.value);
+      else if (ch.removed) dels.push(...ch.value);
       else {
         flush();
-        for (const t of split(ch.value)) {
+        for (const it of ch.value) {
           inChange = false;
-          oldNo++;
-          newNo++;
           flat.push({
-            l: { no: oldNo, text: t, type: "ctx" },
-            r: { no: newNo, text: t, type: "ctx" },
+            l: { no: it.no, text: it.text, type: "ctx" },
+            r: { no: it.no, text: it.text, type: "ctx" },
             key: key++,
           });
         }
@@ -203,6 +250,7 @@ export default function DiffTool() {
     setStats({ add, del });
     setGroups(g + 1);
     setChgPos(-1);
+    setExpanded(new Set());
   }
 
   const items = useMemo<Item[]>(() => {
@@ -216,14 +264,14 @@ export default function DiffTool() {
     return list;
   }, [blocks, expanded]);
 
-  // 对比模式下内容变化(载入文件、左右交换)自动重算,结果实时刷新
+  // 对比模式下内容或选项变化(载入文件、左右交换、勾选项)自动重算,结果实时刷新
   useEffect(() => {
     if (mode !== "diff") return;
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(compute, 200);
     return () => window.clearTimeout(timer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [left, right, mode]);
+  }, [left, right, mode, opts]);
 
   // 渲染后测量每处差异的真实位置:滚动条标记 + 首次自动定位到第一处
   useLayoutEffect(() => {
@@ -330,6 +378,18 @@ export default function DiffTool() {
   return (
     <div className="stack">
       <div className="diff-panes">
+        <div className="diff-opts">
+          {OPT_DEFS.map((o) => (
+            <button
+              key={o.key}
+              className={`opt-chip${opts[o.key] ? " on" : ""}`}
+              onClick={() => setOpts((s) => ({ ...s, [o.key]: !s[o.key] }))}
+            >
+              {opts[o.key] ? "✓ " : ""}
+              {o.label}
+            </button>
+          ))}
+        </div>
         <div className="diff-cols">
           <div className="diff-col-head">
             原文

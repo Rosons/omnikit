@@ -897,8 +897,32 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  height: calc(100vh - 210px);
-  min-height: 360px;
+  height: calc(100vh - 245px);
+  min-height: 340px;
+}
+.diff-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.opt-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: var(--fast);
+}
+.opt-chip:hover { border-color: var(--primary); color: var(--primary); }
+.opt-chip.on {
+  background: var(--primary-dim);
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 500;
 }
 .diff-cols {
   display: grid;

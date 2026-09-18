@@ -138,6 +138,12 @@ devtoolbox/
 - 跳转定位 `el.offsetTop - 72`(露出上文);`.diff-scroll` 加 `position:relative` 作 offsetParent;外层 `.diff-wrap`(relative)承载 nav/rail 浮层
 - 已修过的坑:① 对比结果未就绪时渲染空指针白屏 → 点击即算+空值守卫;② qrcode 库 `toCanvas` 会写内联 `style.width=640px` 顶掉 CSS → 绘制后 JS 显式设回 320px
 
+### v0.1.5 对比选项(2026-09-19,用户要求可勾选忽略项)
+- 内容区顶部加选项 chips(`.opt-chip`,勾选态蓝底):**忽略换行符差异(CR/LF,默认开)、忽略空行、忽略行首尾空白、忽略空白字符、忽略大小写**;勾选变化在对比模式下 200ms 防抖自动重算(effect deps 加 opts)
+- 实现从 `diffLines` 换成**自切行 + `diffArrays`**:`toLines` 用 `split(/(\r\n|\r|\n)/)` 带分隔符切行,每行存 `{no: 原始行号(含被忽略行,行号可对照原文件), text, key}`;key 按 opts 处理(不忽略 CR 时用 \x01-\x03 后缀区分三种行尾;空白/大小写归一化),`comparator: a.key === b.key`;忽略空行在编号之后过滤
+- 忽略空行+忽略空白字符联动:开了忽略空白字符时,纯空白行也视作空行
+- 重算会重置折叠状态(`setExpanded(new Set())`,因为 foldId 基于 key 从 0 重排,不重置会串)
+
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)
 

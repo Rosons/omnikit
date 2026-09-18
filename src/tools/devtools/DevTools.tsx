@@ -393,30 +393,35 @@ function FileHashView({ active }: { active: boolean }) {
     setHashPct(0);
   }
 
-  async function hashFile(path: string) {
+  function selectFile(path: string) {
     setFileName(path);
     setFileRes(null);
     setHashPct(0);
+  }
+
+  async function pickFile() {
+    if (hashing) return;
+    const sel = await open({ multiple: false });
+    if (typeof sel === "string") selectFile(sel);
+  }
+
+  async function startHash() {
+    if (hashing || !fileName) return;
     setHashing(true);
+    setHashPct(0);
     try {
-      const r = await invoke<FileHashResult>("sb_hash_file", { path });
+      const r = await invoke<FileHashResult>("sb_hash_file", { path: fileName });
       setFileRes(r);
     } catch (e) {
       const msg = String(e);
-      if (msg === "已取消") clearFile();
+      if (msg === "已取消") setHashPct(0);
       else showToast(msg, "error", 5000);
     } finally {
       setHashing(false);
     }
   }
 
-  async function pickFile() {
-    if (hashing) return;
-    const sel = await open({ multiple: false });
-    if (typeof sel === "string") hashFile(sel);
-  }
-
-  // 拖入文件直接计算;进度与取消复用全局任务槽
+  // 拖入文件仅选中,点「开始计算」才算;进度与取消复用全局任务槽
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let cancelled = false;
@@ -429,7 +434,7 @@ function FileHashView({ active }: { active: boolean }) {
           setFileDrag(false);
         } else if (p.type === "drop") {
           setFileDrag(false);
-          if (active && p.paths.length && !hashing) hashFile(p.paths[0]);
+          if (active && p.paths.length && !hashing) selectFile(p.paths[0]);
         }
       })
       .then((fn) => {
@@ -470,7 +475,7 @@ function FileHashView({ active }: { active: boolean }) {
                   ? `计算中 ${hashPct.toFixed(0)}%`
                   : fileRes
                     ? `完成 · ${fmtBytes(fileRes.size)}`
-                    : ""}
+                    : "已选择，点击「开始计算」"}
               </div>
             </>
           ) : (
@@ -485,12 +490,24 @@ function FileHashView({ active }: { active: boolean }) {
             </div>
           )}
         </div>
-        {hashing && (
-          <div className="tool-actions">
-            <button className="btn" onClick={cancelHash}>
-              取消
+      </div>
+
+      <div className="tool-actions">
+        {hashing ? (
+          <button className="btn" onClick={cancelHash}>
+            取消
+          </button>
+        ) : (
+          <>
+            <button className="btn btn-primary" onClick={startHash} disabled={!fileName}>
+              开始计算
             </button>
-          </div>
+            {fileName && (
+              <button className="btn" onClick={clearFile}>
+                清空
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -510,13 +527,6 @@ function FileHashView({ active }: { active: boolean }) {
               <div className="hash-value">{value}</div>
             </div>
           ))}
-          {!hashing && (
-            <div className="tool-actions">
-              <button className="btn" onClick={clearFile}>
-                清空
-              </button>
-            </div>
-          )}
         </>
       )}
     </div>

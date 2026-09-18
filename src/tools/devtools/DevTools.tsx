@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { md5 } from "./md5";
+import { showToast } from "../../components/Toast";
 
 const TABS = [
   { id: "json", name: "JSON" },
@@ -60,16 +61,14 @@ function CopyButton({ text, label = "复制" }: { text: string; label?: string }
 function JsonTool() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
-  const [error, setError] = useState("");
 
   function run(pretty: boolean) {
     try {
       const parsed = JSON.parse(input);
       setOutput(pretty ? JSON.stringify(parsed, null, 2) : JSON.stringify(parsed));
-      setError("");
     } catch (e) {
       setOutput("");
-      setError(String(e));
+      showToast(String(e), "error", 5000);
     }
   }
 
@@ -97,13 +96,11 @@ function JsonTool() {
           onClick={() => {
             setInput("");
             setOutput("");
-            setError("");
           }}
         >
           清空
         </button>
-        {error && <span className="hint hint-error">{error}</span>}
-        {!error && output && <span className="hint hint-ok">JSON 合法</span>}
+        {output && <span className="hint hint-ok">JSON 合法</span>}
       </div>
       {output && (
         <div className="field">
@@ -220,10 +217,8 @@ function b64ToUtf8(s: string): string {
 function CodecTool() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
-  const [error, setError] = useState("");
 
   function run(op: "b64e" | "b64d" | "urle" | "urld") {
-    setError("");
     try {
       if (op === "b64e") setOutput(utf8ToB64(input));
       else if (op === "b64d") setOutput(b64ToUtf8(input));
@@ -231,7 +226,13 @@ function CodecTool() {
       else setOutput(decodeURIComponent(input));
     } catch (e) {
       setOutput("");
-      setError(String(e));
+      showToast(
+        op === "b64d" || op === "urld"
+          ? `解码失败:${String(e)}(请确认输入内容合法)`
+          : String(e),
+        "error",
+        5000
+      );
     }
   }
 
@@ -265,13 +266,11 @@ function CodecTool() {
           onClick={() => {
             setInput("");
             setOutput("");
-            setError("");
           }}
         >
           清空
         </button>
       </div>
-      {error && <span className="hint hint-error">{error}(Base64 解码请确认输入合法)</span>}
       {output && (
         <div className="field">
           <span className="field-label">
@@ -334,10 +333,8 @@ function UuidTool() {
 function HashTool() {
   const [input, setInput] = useState("");
   const [hashes, setHashes] = useState<{ algo: string; value: string }[]>([]);
-  const [error, setError] = useState("");
 
   async function compute() {
-    setError("");
     try {
       const data = new TextEncoder().encode(input);
       const results: { algo: string; value: string }[] = [
@@ -353,7 +350,7 @@ function HashTool() {
       setHashes(results);
     } catch (e) {
       setHashes([]);
-      setError(`SHA 计算不可用：${String(e)}`);
+      showToast(`SHA 计算不可用：${String(e)}`, "error", 5000);
     }
   }
 
@@ -385,12 +382,10 @@ function HashTool() {
           onClick={() => {
             setInput("");
             setHashes([]);
-            setError("");
           }}
         >
           清空
         </button>
-        {error && <span className="hint hint-error">{error}</span>}
       </div>
       {hashes.map((h) => (
         <div className="hash-row" key={h.algo}>

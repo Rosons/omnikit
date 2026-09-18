@@ -56,11 +56,8 @@ function WrenchIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
-        d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
-        stroke="#06a7ff"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"
+        fill="#06a7ff"
       />
     </svg>
   );
@@ -69,13 +66,13 @@ function WrenchIcon({ size = 16 }: { size?: number }) {
 function LockIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="4" y="10" width="16" height="10.5" rx="3" fill="#06a7ff" />
       <path
         d="M8 10V7.5a4 4 0 0 1 8 0V10"
-        stroke="#5f6672"
+        stroke="#9fcdfb"
         strokeWidth="2.2"
         strokeLinecap="round"
       />
+      <rect x="4" y="10" width="16" height="10.5" rx="3" fill="#06a7ff" />
       <circle cx="12" cy="14.6" r="1.7" fill="#ffffff" />
       <path d="M12 15.5v2.4" stroke="#ffffff" strokeWidth="1.9" strokeLinecap="round" />
     </svg>

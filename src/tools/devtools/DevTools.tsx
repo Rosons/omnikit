@@ -299,16 +299,18 @@ function UuidTool() {
     <div className="stack">
       <div className="tool-actions">
         <span className="field-label">生成数量</span>
-        {[1, 5, 10, 50].map((n) => (
-          <button
-            key={n}
-            className={`seg-btn${count === n ? " active" : ""}`}
-            style={{ padding: "4px 14px" }}
-            onClick={() => setCount(n)}
-          >
-            {n}
-          </button>
-        ))}
+        <select
+          className="input"
+          style={{ width: 96 }}
+          value={count}
+          onChange={(e) => setCount(Number(e.target.value))}
+        >
+          {[1, 5, 10, 50].map((n) => (
+            <option key={n} value={n}>
+              {n} 个
+            </option>
+          ))}
+        </select>
         <button className="btn btn-primary" onClick={generate}>
           生成 UUID v4
         </button>

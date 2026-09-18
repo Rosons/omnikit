@@ -26,7 +26,7 @@ export default function App() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path
                 d="M9 8.5V7a3 3 0 0 1 3-3h.5a3 3 0 0 1 3 3v1.5"
-                stroke="#5f6672"
+                stroke="#9fcdfb"
                 strokeWidth="2"
                 strokeLinecap="round"
               />

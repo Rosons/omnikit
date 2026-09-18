@@ -21,6 +21,7 @@ export default function PortTool() {
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [proto, setProto] = useState<"all" | "TCP" | "UDP">("all");
 
   async function refresh() {
     setLoading(true);
@@ -42,15 +43,16 @@ export default function PortTool() {
   const filtered = useMemo(() => {
     if (!rows) return null;
     const s = q.trim().toLowerCase();
-    if (!s) return rows;
     return rows.filter(
       (r) =>
-        r.name.toLowerCase().includes(s) ||
-        r.address.toLowerCase().includes(s) ||
-        String(r.port) === s ||
-        String(r.pid) === s,
+        (proto === "all" || r.proto === proto) &&
+        (!s ||
+          r.name.toLowerCase().includes(s) ||
+          r.address.toLowerCase().includes(s) ||
+          String(r.port) === s ||
+          String(r.pid) === s),
     );
-  }, [rows, q]);
+  }, [rows, q, proto]);
 
   async function kill(r: PortRow, e: MouseEvent) {
     e.stopPropagation();
@@ -78,12 +80,23 @@ export default function PortTool() {
       <div className="tool-actions">
         <input
           className="input"
-          style={{ width: 280 }}
+          style={{ width: 240 }}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="输入端口号、PID 或进程名过滤"
           spellCheck={false}
         />
+        <div className="diff-opts">
+          {(["all", "TCP", "UDP"] as const).map((p) => (
+            <button
+              key={p}
+              className={`opt-chip${proto === p ? " on" : ""}`}
+              onClick={() => setProto(p)}
+            >
+              {p === "all" ? "全部" : p}
+            </button>
+          ))}
+        </div>
         <button className="btn" onClick={refresh} disabled={loading}>
           {loading ? "查询中…" : "刷新"}
         </button>

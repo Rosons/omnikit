@@ -77,9 +77,9 @@ export default function PortTool() {
         </button>
         {rows && !loading && (
           <span className="hint">
-            {filtered!.length === rows.length
+            {filtered && filtered.length === rows.length
               ? `共 ${rows.length} 个监听端口`
-              : `匹配 ${filtered!.length} / ${rows.length} 个`}
+              : `匹配 ${filtered ? filtered.length : 0} / ${rows.length} 个`}
           </span>
         )}
       </div>
@@ -97,10 +97,11 @@ export default function PortTool() {
             <div className="spinner" />
           </div>
         )}
-        {rows && filtered!.length === 0 && (
+        {rows && filtered && filtered.length === 0 && (
           <div className="port-empty">没有匹配的端口</div>
         )}
-        {filtered!.map((r, i) => (
+        {filtered &&
+          filtered.map((r, i) => (
           <div className="port-row" key={`${r.proto}-${r.address}-${r.pid}-${i}`}>
             <span className={`port-proto ${r.proto.toLowerCase()}`}>{r.proto}</span>
             <span className="port-addr" title={r.address}>

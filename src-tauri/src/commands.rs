@@ -11,6 +11,25 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+/// 隐藏子进程控制台窗口(netstat/tasklist/taskkill 是控制台程序,直接调会闪黑窗)
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+fn hidden_command(program: &str) -> Command {
+    #[cfg(windows)]
+    {
+        let mut c = Command::new(program);
+        c.creation_flags(CREATE_NO_WINDOW);
+        c
+    }
+    #[cfg(not(windows))]
+    {
+        Command::new(program)
+    }
+}
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -615,7 +634,7 @@ fn parse_netstat(output: &str) -> Vec<PortEntry> {
 }
 
 fn run_gbk_cmd(program: &str, args: &[&str]) -> std::io::Result<String> {
-    let out = Command::new(program).args(args).output()?;
+    let out = hidden_command(program).args(args).output()?;
     let (text, _, _) = encoding_rs::GBK.decode(&out.stdout);
     Ok(text.into_owned())
 }
@@ -662,7 +681,7 @@ pub async fn net_list_ports() -> Result<Vec<PortEntry>, String> {
 
 #[tauri::command]
 pub fn net_kill(pid: u32) -> Result<(), String> {
-    let out = Command::new("taskkill")
+    let out = hidden_command("taskkill")
         .args(["/F", "/PID", &pid.to_string()])
         .output()
         .map_err(|e| format!("无法执行 taskkill：{e}"))?;

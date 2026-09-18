@@ -51,10 +51,16 @@ function GenView() {
       margin: 3,
       errorCorrectionLevel: "M",
       color: { dark: "#1f2329", light: "#ffffff" },
-    }).catch((e) => {
-      setQrOpen(false);
-      showToast(`生成失败：${String(e)}`, "error", 5000);
-    });
+    })
+      .then(() => {
+        // qrcode 库会把 style.width 写成 640px,必须显式改回展示尺寸
+        canvas.style.width = "320px";
+        canvas.style.height = "320px";
+      })
+      .catch((e) => {
+        setQrOpen(false);
+        showToast(`生成失败：${String(e)}`, "error", 5000);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qrOpen]);
 

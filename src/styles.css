@@ -1322,6 +1322,20 @@ body {
 /* 紧凑控件(密码生成/Cron 生成器的数字输入与小按钮) */
 .input-sm { height: 28px; }
 .btn-sm { height: 28px; padding: 0 16px; font-size: 12.5px; }
+/* 与 opt-chip 同规格的胶囊按钮(端口工具栏的刷新) */
+.btn-chip {
+  height: 24px;
+  padding: 0 12px;
+  font-size: 12px;
+  border-radius: 999px;
+  border-color: var(--border);
+  color: var(--text-2);
+}
+.btn-chip:hover:not(:disabled) {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--primary-dim);
+}
 
 /* 正则 flags 徽标:字母独立成块,避免与中文基线不齐 */
 .opt-chip { gap: 5px; }

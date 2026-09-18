@@ -97,7 +97,7 @@ export default function PortTool() {
             </button>
           ))}
         </div>
-        <button className="btn" onClick={refresh} disabled={loading}>
+        <button className="btn btn-chip" onClick={refresh} disabled={loading}>
           {loading ? "查询中…" : "刷新"}
         </button>
         {rows && !loading && (

@@ -146,6 +146,19 @@ devtoolbox/
 - **ctx 行左右各自取原文**:相同块 diffArrays 只回传一侧数组,原实现把同一 item 填给 l/r → 忽略大小写时右侧被左侧文字覆盖;已改为 lp/rp 双游标分别索引 L/R 原数组(忽略规则只影响比较,不影响显示)
 - 折叠行样式改版:去掉整条虚线带,改为两侧 1px 细线 + 居中小胶囊按钮(`.diff-fold` 容器 + `.diff-fold-line` + `.diff-fold-btn`,hover 变主色);展开后区域末尾出现同款「收起 ⌃」胶囊,点击可折叠回去(expanded Set 删除该 id)
 
+### v0.2.0 四个新工具(2026-09-19,用户指定批次:端口→正则→JWT·Cron→密码)
+侧边栏现为 **9 个工具**。新增:
+- **端口占用**(id `port`,`src/tools/port/PortTool.tsx` + Rust):
+  - Rust(commands.rs):`net_list_ports`(spawn_blocking 跑 `netstat -ano`,`run_gbk_cmd` 用 encoding_rs 解 GBK 输出,只留 TCP LISTENING+UDP,`process_names()` 用 `tasklist /fo csv /nh` 建 PID→进程名表,按端口排序)与 `net_kill`(`taskkill /F /PID`,失败透传 GBK 错误消息);`parse_netstat` 有中文样例单测
+  - 前端:过滤框(端口号/PID/进程名/地址实时过滤)、协议徽标(TCP 蓝/UDP 绿)、结束按钮走 `confirm()` 原生确认框,PID 0 禁用;页首自动加载
+- **正则测试**(id `regex`,`src/tools/regex/RegexTool.tsx`):纯前端 JS RegExp;flags 胶囊(g/i/m/s)、实时匹配(matchAll,g 关时只匹配第一处,上限 1000 处)、预览高亮 `<mark class="re-hit">`、明细列表(序号/内容/位置/编号组$1/命名组$name/复制);正则错误红字内联(`.input-error` 红边框)
+- **JWT·Cron**(id `expr`,`src/tools/expr/ExprTool.tsx`,两个子 Tab):
+  - JWT:支持 Bearer 前缀;base64url→UTF-8 解码(`decodeB64Url`);header/payload pretty JSON+复制;alg 徽标、exp/nbf/iat 时间声明行(fmtTime),有效/已过期/未生效 chip(剩余时长 fmtDuration);签名原样保留,不校验签名
+  - Cron:标准 5 字段;`parseField` 支持 * 、a-b、a-b/n、列表(日/周同时受限按 Vixie 语义 OR);字段含义中文描述(`stepText` 识别等差→"每 N 分钟",`listVals` 顿号列举≤6 个);**未来 5 次执行时间**逐分钟扫描(≤1 年);生成器:每 N 分钟/每小时/每天/每周(周几多选)/每月/自定义 六种模式,改动直接写入表达式输入框(input 变更自动切 custom 防回写打架)
+- **密码生成**(id `pwgen`,`src/tools/pwgen/PwGenTool.tsx`):长度 6-64/数量 1-20/四类字符集/排除易混淆(0O1lI 等);`crypto.getRandomValues` 拒绝采样取无偏随机(`randInt`),每类至少一个再 Fisher-Yates 洗牌;熵位显示+强中弱分级(≥90/≥60);进页自动生成一批
+- 新样式:port-head/port-row(与表头同网格)、regex-view/re-list、kv-list/kv-row(通用键值行)、jwt-chip、cron-table、pw-list/pw-row、input-error
+- 新图标(PortIcon 网口三针/RegexIcon 点+星号/ClockIcon 时钟/KeyIcon 钥匙,均双色实心,registry.tsx)
+
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)
 

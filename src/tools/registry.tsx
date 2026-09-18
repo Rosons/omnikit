@@ -49,6 +49,34 @@ export const tools: ToolModule[] = [
     icon: DiffIcon,
     component: lazy(() => import("./diff/DiffTool")),
   },
+  {
+    id: "port",
+    name: "端口占用",
+    desc: "查看监听端口并结束进程",
+    icon: PortIcon,
+    component: lazy(() => import("./port/PortTool")),
+  },
+  {
+    id: "regex",
+    name: "正则测试",
+    desc: "实时匹配高亮与分组解析",
+    icon: RegexIcon,
+    component: lazy(() => import("./regex/RegexTool")),
+  },
+  {
+    id: "expr",
+    name: "JWT·Cron",
+    desc: "令牌解码与定时表达式",
+    icon: ClockIcon,
+    component: lazy(() => import("./expr/ExprTool")),
+  },
+  {
+    id: "pwgen",
+    name: "密码生成",
+    desc: "随机强密码批量生成",
+    icon: KeyIcon,
+    component: lazy(() => import("./pwgen/PwGenTool")),
+  },
 ];
 
 function FolderToolIcon({ size = 16 }: { size?: number }) {
@@ -122,6 +150,59 @@ function DiffIcon({ size = 16 }: { size?: number }) {
         strokeWidth="1.6"
         strokeLinecap="round"
       />
+    </svg>
+  );
+}
+
+function PortIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3" y="5" width="18" height="14" rx="3" fill="#9fcdfb" />
+      <rect x="6" y="10.5" width="12" height="6.5" rx="1.5" fill="#06a7ff" />
+      <rect x="8" y="7" width="2" height="5" rx="1" fill="#06a7ff" />
+      <rect x="11" y="7" width="2" height="5" rx="1" fill="#06a7ff" />
+      <rect x="14" y="7" width="2" height="5" rx="1" fill="#06a7ff" />
+    </svg>
+  );
+}
+
+function RegexIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="5.5" cy="17.5" r="2.6" fill="#9fcdfb" />
+      <g stroke="#06a7ff" strokeWidth="2.4" strokeLinecap="round">
+        <path d="M16.5 3.5v10" />
+        <path d="M12.3 6l8.4 5" />
+        <path d="M20.7 6l-8.4 5" />
+      </g>
+    </svg>
+  );
+}
+
+function ClockIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" fill="#9fcdfb" />
+      <circle cx="12" cy="12" r="9" stroke="#06a7ff" strokeWidth="2" />
+      <path
+        d="M12 7.2V12l3.4 2.5"
+        stroke="#06a7ff"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function KeyIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="7.5" cy="12" r="4.5" fill="#06a7ff" />
+      <circle cx="7.5" cy="12" r="1.8" fill="#ffffff" />
+      <rect x="11" y="10.8" width="10" height="2.4" rx="1.2" fill="#9fcdfb" />
+      <rect x="16" y="12.4" width="2" height="3.4" rx="1" fill="#06a7ff" />
+      <rect x="19.5" y="12.4" width="2" height="3.4" rx="1" fill="#06a7ff" />
     </svg>
   );
 }

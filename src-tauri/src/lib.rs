@@ -23,7 +23,9 @@ pub fn run() {
             commands::sb_hash_file,
             commands::qr_read_image,
             commands::save_data_file,
-            commands::read_text_file
+            commands::read_text_file,
+            commands::net_list_ports,
+            commands::net_kill
         ])
         .run(tauri::generate_context!())
         .expect("DevToolbox 启动失败");

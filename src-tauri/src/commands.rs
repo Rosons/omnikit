@@ -557,6 +557,127 @@ pub fn read_text_file(path: String) -> Result<String, String> {
     }
 }
 
+/* ---------- 端口占用 ---------- */
+
+#[derive(Serialize)]
+pub struct PortEntry {
+    pub proto: String,
+    pub address: String,
+    pub port: u16,
+    pub pid: u32,
+    pub process: String,
+}
+
+/// 解析 netstat -ano 输出:仅保留 TCP LISTENING 与全部 UDP 行
+fn parse_netstat(output: &str) -> Vec<PortEntry> {
+    fn split_addr(s: &str) -> Option<(String, u16)> {
+        let idx = s.rfind(':')?;
+        let port = s[idx + 1..].parse::<u16>().ok()?;
+        Some((s[..idx].trim_matches(['[', ']']).to_string(), port))
+    }
+    let mut out = Vec::new();
+    for line in output.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 4 {
+            continue;
+        }
+        match parts[0] {
+            "TCP" if parts.len() >= 5 && parts[3] == "LISTENING" => {
+                if let Some((address, port)) = split_addr(parts[1]) {
+                    if let Ok(pid) = parts[4].parse::<u32>() {
+                        out.push(PortEntry {
+                            proto: "TCP".into(),
+                            address,
+                            port,
+                            pid,
+                            process: String::new(),
+                        });
+                    }
+                }
+            }
+            "UDP" if parts.len() >= 4 => {
+                if let Some((address, port)) = split_addr(parts[1]) {
+                    if let Ok(pid) = parts[3].parse::<u32>() {
+                        out.push(PortEntry {
+                            proto: "UDP".into(),
+                            address,
+                            port,
+                            pid,
+                            process: String::new(),
+                        });
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+fn run_gbk_cmd(program: &str, args: &[&str]) -> std::io::Result<String> {
+    let out = Command::new(program).args(args).output()?;
+    let (text, _, _) = encoding_rs::GBK.decode(&out.stdout);
+    Ok(text.into_owned())
+}
+
+fn process_names() -> std::collections::HashMap<u32, String> {
+    let mut map = std::collections::HashMap::new();
+    if let Ok(text) = run_gbk_cmd("tasklist", &["/fo", "csv", "/nh"]) {
+        for line in text.lines() {
+            let line = line.trim();
+            if !line.starts_with('"') {
+                continue;
+            }
+            let parts: Vec<&str> = line.split("\",\"").collect();
+            if parts.len() >= 2 {
+                if let Ok(pid) = parts[1].parse::<u32>() {
+                    map.insert(pid, parts[0].trim_start_matches('"').to_string());
+                }
+            }
+        }
+    }
+    map
+}
+
+fn list_ports_impl() -> Result<Vec<PortEntry>, String> {
+    let text = run_gbk_cmd("netstat", &["-ano"]).map_err(|e| format!("无法执行 netstat：{e}"))?;
+    let mut entries = parse_netstat(&text);
+    let names = process_names();
+    for e in entries.iter_mut() {
+        e.process = names
+            .get(&e.pid)
+            .cloned()
+            .unwrap_or_else(|| "未知进程".into());
+    }
+    entries.sort_by(|a, b| a.port.cmp(&b.port).then(a.pid.cmp(&b.pid)));
+    Ok(entries)
+}
+
+#[tauri::command]
+pub async fn net_list_ports() -> Result<Vec<PortEntry>, String> {
+    tauri::async_runtime::spawn_blocking(list_ports_impl)
+        .await
+        .map_err(|e| format!("任务执行失败：{e}"))?
+}
+
+#[tauri::command]
+pub fn net_kill(pid: u32) -> Result<(), String> {
+    let out = Command::new("taskkill")
+        .args(["/F", "/PID", &pid.to_string()])
+        .output()
+        .map_err(|e| format!("无法执行 taskkill：{e}"))?;
+    if out.status.success() {
+        return Ok(());
+    }
+    let (so, _, _) = encoding_rs::GBK.decode(&out.stdout);
+    let (se, _, _) = encoding_rs::GBK.decode(&out.stderr);
+    let so = so.trim();
+    let se = se.trim();
+    let msg = if so.is_empty() { se } else { so };
+    let msg = if msg.is_empty() { "未知错误" } else { msg };
+    Err(format!("结束进程（PID {pid}）失败：{msg}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -580,5 +701,17 @@ mod tests {
         );
         assert_eq!(r.size, 3);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn netstat_parse_sample() {
+        let sample = "\n  活动连接\n\n  协议  本地地址          外部地址        状态           PID\n\n  TCP    0.0.0.0:135           0.0.0.0:0              LISTENING       1120\n  TCP    [::]:135              [::]:0                 LISTENING       1120\n  TCP    127.0.0.1:8000        0.0.0.0:0              TIME_WAIT       4444\n  UDP    0.0.0.0:5353          *:*                                    5555\n";
+        let v = parse_netstat(sample);
+        assert_eq!(v.len(), 3);
+        assert_eq!(v[0].proto, "TCP");
+        assert_eq!(v[0].port, 135);
+        assert_eq!(v[1].address, "::");
+        assert_eq!(v[2].proto, "UDP");
+        assert_eq!(v[2].pid, 5555);
     }
 }

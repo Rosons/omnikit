@@ -1101,6 +1101,205 @@ body {
 .diff-marker.mod { background: #f59e0b; }
 .diff-marker.del { background: var(--danger); }
 .diff-marker.add { background: var(--success); }
+
+/* ===== 端口占用 ===== */
+.port-head,
+.port-row {
+  display: grid;
+  grid-template-columns: 56px 1fr 90px 210px 60px;
+  gap: var(--sp-3);
+  padding: 0 var(--sp-4);
+  align-items: center;
+}
+.port-head {
+  height: 38px;
+  background: var(--fill);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius-m) var(--radius-m) 0 0;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.port-list {
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-m) var(--radius-m);
+  background: var(--card);
+  max-height: calc(100vh - 350px);
+  min-height: 220px;
+  overflow-y: auto;
+}
+.port-row {
+  height: 42px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.port-row:hover { background: var(--fill); }
+.port-row:last-child { border-bottom: none; }
+.port-proto {
+  justify-self: start;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.port-proto.tcp { background: #e8f3ff; color: #2f7df6; }
+.port-proto.udp { background: #e8f7f0; color: #00a870; }
+.port-addr {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12.5px;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.port-pid { color: var(--text-2); font-size: 12.5px; }
+.port-name {
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.port-kill { padding: 2px 8px; }
+.port-kill:hover:not(:disabled) { color: var(--danger); background: var(--danger-dim); }
+.port-empty { padding: 32px; text-align: center; color: var(--text-3); font-size: 13px; }
+
+/* ===== 正则测试 ===== */
+.input-error,
+.input-error:focus { border-color: var(--danger); }
+.regex-view {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  padding: 10px 12px;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-height: 44px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.regex-view mark.re-hit {
+  background: var(--primary-dim);
+  color: var(--primary);
+  font-weight: 600;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.re-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  overflow: hidden;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.re-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.re-row:last-child { border-bottom: none; }
+.re-idx { flex: none; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.re-val {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  color: var(--text-1);
+  word-break: break-all;
+  min-width: 0;
+}
+.re-pos { flex: none; color: var(--text-3); font-size: 12px; }
+.re-groups { flex: none; color: var(--text-2); font-size: 12px; word-break: break-all; }
+
+/* ===== 键值行(JWT 时间声明 / Cron 执行计划) ===== */
+.kv-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  overflow: hidden;
+}
+.kv-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.kv-row:last-child { border-bottom: none; }
+.kv-k {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+}
+.kv-v { color: var(--text-1); font-variant-numeric: tabular-nums; }
+
+.jwt-chip {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.jwt-chip.valid { background: var(--success-dim); color: var(--success); }
+.jwt-chip.expired { background: var(--danger-dim); color: var(--danger); }
+.jwt-chip.pending { background: #fff8e8; color: #f59e0b; }
+
+/* ===== Cron ===== */
+.cron-table {
+  display: grid;
+  grid-template-columns: 64px 130px 1fr;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  overflow: hidden;
+  font-size: 12.5px;
+}
+.cron-table > div {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.cron-table > div:nth-last-child(-n + 3) { border-bottom: none; }
+.cron-h { background: var(--fill); color: var(--text-2); }
+.cron-f { color: var(--text-2); }
+.cron-v {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  color: var(--text-1);
+}
+.cron-d { color: var(--text-1); }
+
+/* ===== 密码生成 ===== */
+.pw-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  overflow: hidden;
+}
+.pw-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.pw-row:last-child { border-bottom: none; }
+.pw-row:hover { background: var(--fill); }
+.pw-val {
+  flex: 1;
+  min-width: 0;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 13px;
+  color: var(--text-1);
+  word-break: break-all;
+}
+.pw-strength { font-size: 12.5px; font-weight: 600; }
+.pw-strength.s-high { color: var(--success); }
+.pw-strength.s-mid { color: #f59e0b; }
+.pw-strength.s-low { color: var(--danger); }
 .diff-stats {
   display: inline-flex;
   gap: 10px;

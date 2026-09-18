@@ -122,6 +122,15 @@ devtoolbox/
 - Rust 新命令(commands.rs):`qr_read_image`(>32MB 拒绝)、`save_data_file`、`read_text_file`(>4MB 拒绝);Cargo 新依赖 `base64 0.22`、`encoding_rs 0.8`;capabilities 加 `dialog:allow-save`(显式,防 default 不含 save)
 - 侧边栏现为 5 个工具;图标继续蓝色双色实心风(QrIcon=三个定位角+点阵、DiffIcon=浅/深双面板加减号,均在 registry.tsx)
 
+### v0.1.3 展示优化(2026-09-18,用户反馈)
+- **二维码改弹窗展示**:点「生成二维码」弹出全屏居中 modal(`.modal-mask`+`.qr-modal`,fixed inset-0 遮罩,点遮罩/关闭按钮/Esc 均可关),内部 640px 生成、CSS 320px 展示;保存图片按钮移入弹窗;modal 样式做成通用类,后续工具可复用
+- **文本对比改左右分栏对比视图**(不再有下方结果区):
+  - 内容区撑满剩余高度(`.diff-panes` height calc(100vh-210px) min 360),**按钮移到最下面**(开始对比/返回编辑、左右交换、清空、+N −M 统计)
+  - 编辑/对比同一区域切换:编辑模式=两个大 textarea;点「开始对比」→ 同区域变成**左右对齐的分栏 diff**(jsdiff 结果按 del/add 块配对成 Pair{l,r},空侧灰底补位,单一 grid 滚动容器天然行对齐,左列右边框做分隔线);点「返回编辑」回 textarea
+  - 对比模式实时:载入文件/左右交换后 200ms 防抖自动重算(`useEffect [left,right,mode]`)
+  - 每行=行号槽(42px 右对齐)+ +/− 标记 + 内容(pre-wrap 自动换行,不出横向滚动);完全一致显示「两段内容完全一致」;超 4000 行截断
+  - `.diff-no/.diff-mark/.diff-line` 类名保留但语义变为 cell 内元素,旧的 `.diff-out/.diff-row/.diff-grid` 已删
+
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)
 

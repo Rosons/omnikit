@@ -38,29 +38,44 @@ export default function QrTool() {
 /* ---------- 生成 ---------- */
 function GenView() {
   const [text, setText] = useState("");
-  const [hasQr, setHasQr] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  async function generate() {
+  // 弹窗打开时绘制;内部按 640px 生成,展示 320px 依旧清晰
+  useEffect(() => {
+    if (!qrOpen) return;
     const canvas = canvasRef.current;
     if (!canvas || !text.trim()) return;
-    try {
-      await QRCode.toCanvas(canvas, text, {
-        width: 528,
-        margin: 3,
-        errorCorrectionLevel: "M",
-        color: { dark: "#1f2329", light: "#ffffff" },
-      });
-      setHasQr(true);
-    } catch (e) {
-      setHasQr(false);
+    QRCode.toCanvas(canvas, text, {
+      width: 640,
+      margin: 3,
+      errorCorrectionLevel: "M",
+      color: { dark: "#1f2329", light: "#ffffff" },
+    }).catch((e) => {
+      setQrOpen(false);
       showToast(`生成失败：${String(e)}`, "error", 5000);
-    }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrOpen]);
+
+  // Esc 关闭弹窗
+  useEffect(() => {
+    if (!qrOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setQrOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [qrOpen]);
+
+  function generate() {
+    if (!text.trim()) return;
+    setQrOpen(true);
   }
 
   async function saveImage() {
     const canvas = canvasRef.current;
-    if (!canvas || !hasQr) return;
+    if (!canvas || !qrOpen) return;
     const target = await save({
       title: "保存二维码",
       defaultPath: "二维码.png",
@@ -85,7 +100,7 @@ function GenView() {
         <span className="field-label">二维码内容（链接或任意文本）</span>
         <textarea
           className="textarea"
-          style={{ height: 92 }}
+          style={{ height: 110 }}
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="粘贴链接或文本，如 https://example.com"
@@ -100,20 +115,26 @@ function GenView() {
           className="btn"
           onClick={() => {
             setText("");
-            setHasQr(false);
+            setQrOpen(false);
           }}
         >
           清空
         </button>
       </div>
-      <div className="qr-stage" style={{ display: hasQr ? "flex" : "none" }}>
-        <canvas ref={canvasRef} />
-        <div className="tool-actions">
-          <button className="btn" onClick={saveImage}>
-            保存图片
-          </button>
+
+      <div className={`modal-mask${qrOpen ? " open" : ""}`} onClick={() => setQrOpen(false)}>
+        <div className="qr-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="qr-modal-title">手机扫码即可打开链接或查看文本</div>
+          <canvas ref={canvasRef} />
+          <div className="tool-actions">
+            <button className="btn btn-primary" onClick={saveImage}>
+              保存图片
+            </button>
+            <button className="btn" onClick={() => setQrOpen(false)}>
+              关闭
+            </button>
+          </div>
         </div>
-        <div className="hint">手机扫码即可打开链接或查看文本</div>
       </div>
     </div>
   );

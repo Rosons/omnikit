@@ -156,8 +156,9 @@ devtoolbox/
   - JWT:支持 Bearer 前缀;base64url→UTF-8 解码(`decodeB64Url`);header/payload pretty JSON+复制;alg 徽标、exp/nbf/iat 时间声明行(fmtTime),有效/已过期/未生效 chip(剩余时长 fmtDuration);签名原样保留,不校验签名
   - Cron:标准 5 字段;`parseField` 支持 * 、a-b、a-b/n、列表(日/周同时受限按 Vixie 语义 OR);字段含义中文描述(`stepText` 识别等差→"每 N 分钟",`listVals` 顿号列举≤6 个);**未来 5 次执行时间**逐分钟扫描(≤1 年);生成器:每 N 分钟/每小时/每天/每周(周几多选)/每月/自定义 六种模式,改动直接写入表达式输入框(input 变更自动切 custom 防回写打架)
 - **密码生成**(id `pwgen`,`src/tools/pwgen/PwGenTool.tsx`):长度 6-64/数量 1-20/四类字符集/排除易混淆(0O1lI 等);`crypto.getRandomValues` 拒绝采样取无偏随机(`randInt`),每类至少一个再 Fisher-Yates 洗牌;熵位显示+强中弱分级(≥90/≥60);进页自动生成一批
-- 新样式:port-head/port-row(与表头同网格)、regex-view/re-list、kv-list/kv-row(通用键值行)、jwt-chip、cron-table、pw-list/pw-row、input-error
-- 新图标(PortIcon 网口三针/RegexIcon 点+星号/ClockIcon 时钟/KeyIcon 钥匙,均双色实心,registry.tsx)
+- 新样式:port-head/port-row(与表头同网格)、regex-view/re-list、kv-list/kv-row(通用键值行)、jwt-chip、cron-table、pw-list/pw-row、input-error;新图标(PortIcon 网口三针/RegexIcon 点+星号/ClockIcon 时钟/KeyIcon 钥匙,均双色实心,registry.tsx)
+- **工具布局调整(用户反馈)**:「JWT·Cron」合并菜单被否 → **Cron 独立成工具**(id `cron`,`src/tools/cron/CronTool.tsx`,内含解析/生成子页);**JWT 并入「开发小工具」第六个子 Tab**(DevTools.tsx 内 JwtTool,以后的小工具也加在这里);netstat/tasklist/taskkill 加 `CREATE_NO_WINDOW`(`hidden_command` 辅助)消除黑窗闪烁
+- 端口页曾因「数据未加载时 filtered 为 null 直接 .map」白屏一次(diff 页同类问题第二次出现)——**教训:渲染列表永远不要用 `!` 非空断言,一律 `xxx &&` 守卫**
 
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)

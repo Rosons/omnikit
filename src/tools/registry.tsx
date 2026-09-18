@@ -64,11 +64,11 @@ export const tools: ToolModule[] = [
     component: lazy(() => import("./regex/RegexTool")),
   },
   {
-    id: "expr",
-    name: "JWT 与 Cron",
-    desc: "令牌解码与定时表达式",
+    id: "cron",
+    name: "Cron 表达式",
+    desc: "定时表达式解析与生成",
     icon: ClockIcon,
-    component: lazy(() => import("./expr/ExprTool")),
+    component: lazy(() => import("./cron/CronTool")),
   },
   {
     id: "pwgen",

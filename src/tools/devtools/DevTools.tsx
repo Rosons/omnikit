@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { md5 } from "./md5";
-import { fmtBytes, baseName } from "../../lib/format";
+import { fmtBytes, fmtDuration, fmtTime, baseName } from "../../lib/format";
 import { showToast } from "../../components/Toast";
 import CopyButton from "../../components/CopyButton";
 
@@ -14,6 +14,7 @@ const TABS = [
   { id: "codec", name: "编解码" },
   { id: "uuid", name: "UUID" },
   { id: "hash", name: "哈希" },
+  { id: "jwt", name: "JWT" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -38,6 +39,7 @@ export default function DevTools() {
       {tab === "codec" && <CodecTool />}
       {tab === "uuid" && <UuidTool />}
       {tab === "hash" && <HashTool />}
+      {tab === "jwt" && <JwtTool />}
     </div>
   );
 }
@@ -574,6 +576,131 @@ function TextHashView() {
           <div className="hash-value">{h.value}</div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/* ---------- JWT 解析 ---------- */
+function decodeB64Url(s: string): string | null {
+  try {
+    let b = s.replace(/-/g, "+").replace(/_/g, "/");
+    while (b.length % 4) b += "=";
+    const bin = atob(b);
+    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+  } catch {
+    return null;
+  }
+}
+
+type JwtResult =
+  | { err: string }
+  | { header: unknown; payload: unknown; signature: string };
+
+function JwtTool() {
+  const [token, setToken] = useState("");
+
+  const info = useMemo<JwtResult | null>(() => {
+    const t = token.trim().replace(/^Bearer\s+/i, "");
+    if (!t) return null;
+    const parts = t.split(".");
+    if (parts.length !== 3) return { err: "不是有效的 JWT：应为三段 base64url，以点分隔" };
+    const h = decodeB64Url(parts[0]);
+    const p = decodeB64Url(parts[1]);
+    if (h === null || p === null) return { err: "base64url 解码失败，请检查内容" };
+    try {
+      return { header: JSON.parse(h), payload: JSON.parse(p), signature: parts[2] };
+    } catch {
+      return { err: "header 或 payload 不是合法 JSON" };
+    }
+  }, [token]);
+
+  const header = info && !("err" in info) ? (info.header as Record<string, unknown>) : null;
+  const payload = info && !("err" in info) ? (info.payload as Record<string, unknown>) : null;
+  const nowSec = Date.now() / 1000;
+  const num = (v: unknown) => (typeof v === "number" ? v : undefined);
+  const iat = payload ? num(payload.iat) : undefined;
+  const nbf = payload ? num(payload.nbf) : undefined;
+  const exp = payload ? num(payload.exp) : undefined;
+  const expired = exp !== undefined && exp < nowSec;
+  const pending = !expired && nbf !== undefined && nbf > nowSec;
+  const pretty = (v: unknown) => JSON.stringify(v, null, 2);
+
+  return (
+    <div className="stack">
+      <div className="field">
+        <span className="field-label">JWT 令牌（支持 Bearer 前缀；仅解码内容，不校验签名）</span>
+        <textarea
+          className="textarea input-mono"
+          style={{ height: 96 }}
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="粘贴 eyJ 开头的令牌"
+          spellCheck={false}
+        />
+      </div>
+
+      {info && "err" in info && <span className="hint hint-error">{info.err}</span>}
+
+      {header && payload && info && !("err" in info) && (
+        <>
+          <div className="tool-actions">
+            <span className="jwt-chip pending">算法：{String(header.alg ?? "未知")}</span>
+            {exp !== undefined &&
+              (expired ? (
+                <span className="jwt-chip expired">已过期 {fmtDuration((nowSec - exp) * 1000)}</span>
+              ) : (
+                <span className="jwt-chip valid">
+                  有效 · 剩余 {fmtDuration((exp - nowSec) * 1000)}
+                </span>
+              ))}
+            {pending && <span className="jwt-chip pending">尚未生效</span>}
+          </div>
+
+          <div className="field">
+            <span className="field-label">
+              Header
+              <CopyButton text={pretty(header)} />
+            </span>
+            <textarea className="textarea" style={{ height: 96 }} value={pretty(header)} readOnly spellCheck={false} />
+          </div>
+          <div className="field">
+            <span className="field-label">
+              Payload
+              <CopyButton text={pretty(payload)} />
+            </span>
+            <textarea className="textarea" style={{ height: 150 }} value={pretty(payload)} readOnly spellCheck={false} />
+          </div>
+
+          {(iat !== undefined || nbf !== undefined || exp !== undefined) && (
+            <div className="kv-list">
+              {iat !== undefined && (
+                <div className="kv-row">
+                  <span className="kv-k">签发时间</span>
+                  <span className="kv-v">{fmtTime(iat)}</span>
+                </div>
+              )}
+              {nbf !== undefined && (
+                <div className="kv-row">
+                  <span className="kv-k">生效时间</span>
+                  <span className="kv-v">{fmtTime(nbf)}</span>
+                </div>
+              )}
+              {exp !== undefined && (
+                <div className="kv-row">
+                  <span className="kv-k">过期时间</span>
+                  <span className="kv-v">{fmtTime(exp)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="field">
+            <span className="field-label">签名（base64url，保留原样）</span>
+            <input className="input input-mono" value={info.signature || "（空，未签名）"} readOnly spellCheck={false} />
+          </div>
+        </>
+      )}
     </div>
   );
 }

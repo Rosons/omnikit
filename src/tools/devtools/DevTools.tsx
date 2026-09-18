@@ -323,7 +323,7 @@ function UuidTool() {
             value={list.join("\n")}
             readOnly
             spellCheck={false}
-            style={{ minHeight: 180 }}
+            rows={Math.min(Math.max(list.length + 1, 12), 28)}
           />
         </div>
       )}

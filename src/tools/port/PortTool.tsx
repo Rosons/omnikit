@@ -76,7 +76,7 @@ export default function PortTool() {
   }
 
   return (
-    <div className="stack">
+    <div className="stack port-page">
       <div className="tool-actions">
         <input
           className="input"

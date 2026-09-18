@@ -1106,6 +1106,11 @@ body {
 .diff-marker.add { background: var(--success); }
 
 /* ===== 端口占用 ===== */
+/* 整页撑满视口剩余高度,列表区域自适应拉伸 */
+.port-page {
+  height: calc(100vh - 245px);
+  min-height: 320px;
+}
 .port-head,
 .port-row {
   display: grid;
@@ -1124,11 +1129,11 @@ body {
   color: var(--text-2);
 }
 .port-list {
+  flex: 1;
+  min-height: 220px;
   border: 1px solid var(--border);
   border-radius: 0 0 var(--radius-m) var(--radius-m);
   background: var(--card);
-  max-height: calc(100vh - 350px);
-  min-height: 220px;
   overflow-y: auto;
 }
 .port-row {

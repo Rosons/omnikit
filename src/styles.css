@@ -792,6 +792,10 @@ body {
 .dropzone-sm { padding: 18px; gap: 4px; }
 .dropzone-sm .progress-track { max-width: 420px; }
 
+/* 子级分段 Tab(工具内部) */
+.seg-sm { margin-bottom: var(--sp-4); }
+.seg-sm .seg-btn { padding: 5px 14px; font-size: 12.5px; }
+
 /* 选中态按钮(与普通按钮同高) */
 .btn-selected {
   border-color: var(--primary);

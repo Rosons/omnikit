@@ -352,15 +352,46 @@ interface FileHashResult {
 }
 
 function HashTool() {
-  const [input, setInput] = useState("");
-  const [hashes, setHashes] = useState<{ algo: string; value: string }[]>([]);
+  const [mode, setMode] = useState<"file" | "text">("file");
+  return (
+    <div>
+      <div className="seg seg-sm" role="tablist">
+        <button
+          className={`seg-btn${mode === "file" ? " active" : ""}`}
+          onClick={() => setMode("file")}
+        >
+          文件校验
+        </button>
+        <button
+          className={`seg-btn${mode === "text" ? " active" : ""}`}
+          onClick={() => setMode("text")}
+        >
+          文本哈希
+        </button>
+      </div>
+      {/* 两个视图常驻挂载(仅隐藏),切 Tab 不打断后台计算 */}
+      <div style={{ display: mode === "file" ? "" : "none" }}>
+        <FileHashView active={mode === "file"} />
+      </div>
+      <div style={{ display: mode === "text" ? "" : "none" }}>
+        <TextHashView />
+      </div>
+    </div>
+  );
+}
 
-  // 文件校验
+function FileHashView({ active }: { active: boolean }) {
   const [fileName, setFileName] = useState("");
   const [hashing, setHashing] = useState(false);
   const [hashPct, setHashPct] = useState(0);
   const [fileRes, setFileRes] = useState<FileHashResult | null>(null);
   const [fileDrag, setFileDrag] = useState(false);
+
+  function clearFile() {
+    setFileName("");
+    setFileRes(null);
+    setHashPct(0);
+  }
 
   async function hashFile(path: string) {
     setFileName(path);
@@ -372,7 +403,8 @@ function HashTool() {
       setFileRes(r);
     } catch (e) {
       const msg = String(e);
-      if (msg !== "已取消") showToast(msg, "error", 5000);
+      if (msg === "已取消") clearFile();
+      else showToast(msg, "error", 5000);
     } finally {
       setHashing(false);
     }
@@ -391,11 +423,13 @@ function HashTool() {
     getCurrentWebview()
       .onDragDropEvent((event) => {
         const p = event.payload;
-        if (p.type === "enter" || p.type === "over") setFileDrag(true);
-        else if (p.type === "leave") setFileDrag(false);
-        else if (p.type === "drop") {
+        if (p.type === "enter" || p.type === "over") {
+          if (active) setFileDrag(true);
+        } else if (p.type === "leave") {
           setFileDrag(false);
-          if (p.paths.length && !hashing) hashFile(p.paths[0]);
+        } else if (p.type === "drop") {
+          setFileDrag(false);
+          if (active && p.paths.length && !hashing) hashFile(p.paths[0]);
         }
       })
       .then((fn) => {
@@ -418,30 +452,9 @@ function HashTool() {
     await invoke("sb_cancel").catch(() => {});
   }
 
-  async function compute() {
-    try {
-      const data = new TextEncoder().encode(input);
-      const results: { algo: string; value: string }[] = [
-        { algo: "MD5", value: md5(input) },
-      ];
-      for (const algo of ["SHA-1", "SHA-256", "SHA-512"] as const) {
-        const buf = await crypto.subtle.digest(algo, data);
-        const hexStr = [...new Uint8Array(buf)]
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join("");
-        results.push({ algo, value: hexStr });
-      }
-      setHashes(results);
-    } catch (e) {
-      setHashes([]);
-      showToast(`SHA 计算不可用：${String(e)}`, "error", 5000);
-    }
-  }
-
   return (
     <div className="stack">
       <div className="field">
-        <span className="field-label">文件校验（完整读取计算，大小不限，数据不出本机）</span>
         <div
           className={`dropzone dropzone-sm${fileDrag ? " over" : ""}`}
           onClick={pickFile}
@@ -463,7 +476,7 @@ function HashTool() {
           ) : (
             <>
               <div className="dropzone-title">拖入文件到此处，或点击选择</div>
-              <div className="dropzone-sub">下载文件验完整性用，只在本机计算</div>
+              <div className="dropzone-sub">完整读取计算，大小不限，数据不出本机</div>
             </>
           )}
           {hashing && (
@@ -497,11 +510,47 @@ function HashTool() {
               <div className="hash-value">{value}</div>
             </div>
           ))}
+          {!hashing && (
+            <div className="tool-actions">
+              <button className="btn" onClick={clearFile}>
+                清空
+              </button>
+            </div>
+          )}
         </>
       )}
+    </div>
+  );
+}
 
-      <div className="field" style={{ marginTop: 8 }}>
-        <span className="field-label">文本哈希（按 UTF-8 计算）</span>
+function TextHashView() {
+  const [input, setInput] = useState("");
+  const [hashes, setHashes] = useState<{ algo: string; value: string }[]>([]);
+
+  async function compute() {
+    try {
+      const data = new TextEncoder().encode(input);
+      const results: { algo: string; value: string }[] = [
+        { algo: "MD5", value: md5(input) },
+      ];
+      for (const algo of ["SHA-1", "SHA-256", "SHA-512"] as const) {
+        const buf = await crypto.subtle.digest(algo, data);
+        const hexStr = [...new Uint8Array(buf)]
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        results.push({ algo, value: hexStr });
+      }
+      setHashes(results);
+    } catch (e) {
+      setHashes([]);
+      showToast(`SHA 计算不可用：${String(e)}`, "error", 5000);
+    }
+  }
+
+  return (
+    <div className="stack">
+      <div className="field">
+        <span className="field-label">输入文本（按 UTF-8 计算）</span>
         <textarea
           className="textarea"
           value={input}

@@ -27,7 +27,10 @@ interface Pair {
 type Block =
   | { kind: "rows"; pairs: Pair[] }
   | { kind: "fold"; id: number; count: number; hidden: Pair[] };
-type Item = { kind: "pair"; p: Pair } | { kind: "fold"; id: number; count: number };
+type Item =
+  | { kind: "pair"; p: Pair }
+  | { kind: "fold"; id: number; count: number }
+  | { kind: "collapse"; id: number; count: number };
 
 const MAX_CHARS = 2_000_000;
 const FOLD_MIN = 10;
@@ -270,8 +273,10 @@ export default function DiffTool() {
     const list: Item[] = [];
     for (const b of blocks) {
       if (b.kind === "rows") for (const p of b.pairs) list.push({ kind: "pair", p });
-      else if (expanded.has(b.id)) for (const p of b.hidden) list.push({ kind: "pair", p });
-      else list.push({ kind: "fold", id: b.id, count: b.count });
+      else if (expanded.has(b.id)) {
+        for (const p of b.hidden) list.push({ kind: "pair", p });
+        list.push({ kind: "collapse", id: b.id, count: b.count });
+      } else list.push({ kind: "fold", id: b.id, count: b.count });
     }
     return list;
   }, [blocks, expanded]);
@@ -446,6 +451,23 @@ export default function DiffTool() {
                         onClick={() => setExpanded((s) => new Set(s).add(it.id))}
                       >
                         展开中间相同的 {it.count} 行 ⌄
+                      </button>
+                      <span className="diff-fold-line" />
+                    </div>
+                  ) : it.kind === "collapse" ? (
+                    <div key={`c-${it.id}`} className="diff-fold">
+                      <span className="diff-fold-line" />
+                      <button
+                        className="diff-fold-btn"
+                        onClick={() =>
+                          setExpanded((s) => {
+                            const n = new Set(s);
+                            n.delete(it.id);
+                            return n;
+                          })
+                        }
+                      >
+                        收起相同的 {it.count} 行 ⌃
                       </button>
                       <span className="diff-fold-line" />
                     </div>

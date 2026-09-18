@@ -2,9 +2,14 @@ use crate::error::Error;
 use crate::history::HistoryEntry;
 use crate::pack::{collect_files, pack, Progress as PackProgress};
 use crate::unpack::unpack;
+use md5::{Digest, Md5};
 use serde::Serialize;
+use sha1::Sha1;
+use sha2::{Sha256, Sha512};
 use std::cell::Cell;
-use std::path::PathBuf;
+use std::fs;
+use std::io::Read;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -377,5 +382,138 @@ pub fn sb_history_clear(app: AppHandle) {
 pub fn sb_cancel(state: tauri::State<'_, AppState>) {
     if let Some(flag) = state.cancel_slot.lock().unwrap().as_ref() {
         flag.store(true, Ordering::Relaxed);
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileHashResult {
+    pub file: String,
+    pub size: u64,
+    pub md5: String,
+    pub sha1: String,
+    pub sha256: String,
+    pub sha512: String,
+}
+
+fn to_hex(bytes: &[u8]) -> String {
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        s.push_str(&format!("{:02x}", b));
+    }
+    s
+}
+
+/// 流式计算单个文件的 MD5 / SHA-1 / SHA-256 / SHA-512(一次读取同时喂四个哈希器)
+pub fn compute_file_hashes(
+    path: &Path,
+    should_stop: impl Fn() -> bool,
+    progress: impl Fn(u64, u64),
+) -> crate::error::Result<FileHashResult> {
+    let total = fs::metadata(path)?.len();
+    let mut file = fs::File::open(path)?;
+    let mut md5h = Md5::new();
+    let mut sha1h = Sha1::new();
+    let mut sha256h = Sha256::new();
+    let mut sha512h = Sha512::new();
+    let mut buf = vec![0u8; 1024 * 1024];
+    let mut done: u64 = 0;
+    let mut last_emit: u64 = 0;
+    loop {
+        if should_stop() {
+            return Err(Error::Cancelled);
+        }
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        md5h.update(&buf[..n]);
+        sha1h.update(&buf[..n]);
+        sha256h.update(&buf[..n]);
+        sha512h.update(&buf[..n]);
+        done += n as u64;
+        if done - last_emit >= 8 * 1024 * 1024 {
+            last_emit = done;
+            progress(done, total);
+        }
+    }
+    progress(done, total);
+    Ok(FileHashResult {
+        file: path.to_string_lossy().into_owned(),
+        size: total,
+        md5: to_hex(&md5h.finalize()),
+        sha1: to_hex(&sha1h.finalize()),
+        sha256: to_hex(&sha256h.finalize()),
+        sha512: to_hex(&sha512h.finalize()),
+    })
+}
+
+/// 文件校验:计算四算法哈希,支持通过 sb_cancel 取消
+#[tauri::command]
+pub async fn sb_hash_file(
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+    path: String,
+) -> Result<FileHashResult, String> {
+    if path.is_empty() {
+        return Err("没有选择文件".into());
+    }
+    let p = PathBuf::from(path);
+    let cancelled = Arc::new(AtomicBool::new(false));
+    *state.cancel_slot.lock().unwrap() = Some(cancelled.clone());
+    let task_flag = cancelled.clone();
+    let app2 = app.clone();
+
+    let joined = tauri::async_runtime::spawn_blocking(move || {
+        compute_file_hashes(
+            &p,
+            || task_flag.load(Ordering::Relaxed),
+            |done, total| {
+                let _ = app2.emit(
+                    "hashfile://progress",
+                    serde_json::json!({ "done": done, "total": total }),
+                );
+            },
+        )
+    })
+    .await;
+    {
+        let mut slot = state.cancel_slot.lock().unwrap();
+        if slot
+            .as_ref()
+            .map(|f| Arc::ptr_eq(f, &cancelled))
+            .unwrap_or(false)
+        {
+            *slot = None;
+        }
+    }
+    joined
+        .map_err(|e| format!("任务执行失败:{e}"))?
+        .map_err(|e: Error| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_hash_known_vectors() {
+        let dir = std::env::temp_dir().join(format!("devtoolbox-hash-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("abc.txt");
+        fs::write(&p, b"abc").unwrap();
+        let r = compute_file_hashes(&p, || false, |_, _| {}).unwrap();
+        assert_eq!(r.md5, "900150983cd24fb0d6963f7d28e17f72");
+        assert_eq!(r.sha1, "a9993e364706816aba3e25717850c26c9cd0d89d");
+        assert_eq!(
+            r.sha256,
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert_eq!(
+            r.sha512,
+            "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"
+        );
+        assert_eq!(r.size, 3);
+        let _ = fs::remove_dir_all(&dir);
     }
 }

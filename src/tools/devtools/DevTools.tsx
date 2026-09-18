@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { open } from "@tauri-apps/plugin-dialog";
 import { md5 } from "./md5";
+import { fmtBytes } from "../../lib/format";
 import { showToast } from "../../components/Toast";
 
 const TABS = [
@@ -332,9 +337,86 @@ function UuidTool() {
 }
 
 /* ---------- 哈希 ---------- */
+function baseName(p: string): string {
+  const i = Math.max(p.lastIndexOf("\\"), p.lastIndexOf("/"));
+  return i >= 0 ? p.slice(i + 1) : p;
+}
+
+interface FileHashResult {
+  file: string;
+  size: number;
+  md5: string;
+  sha1: string;
+  sha256: string;
+  sha512: string;
+}
+
 function HashTool() {
   const [input, setInput] = useState("");
   const [hashes, setHashes] = useState<{ algo: string; value: string }[]>([]);
+
+  // 文件校验
+  const [fileName, setFileName] = useState("");
+  const [hashing, setHashing] = useState(false);
+  const [hashPct, setHashPct] = useState(0);
+  const [fileRes, setFileRes] = useState<FileHashResult | null>(null);
+  const [fileDrag, setFileDrag] = useState(false);
+
+  async function hashFile(path: string) {
+    setFileName(path);
+    setFileRes(null);
+    setHashPct(0);
+    setHashing(true);
+    try {
+      const r = await invoke<FileHashResult>("sb_hash_file", { path });
+      setFileRes(r);
+    } catch (e) {
+      const msg = String(e);
+      if (msg !== "已取消") showToast(msg, "error", 5000);
+    } finally {
+      setHashing(false);
+    }
+  }
+
+  async function pickFile() {
+    if (hashing) return;
+    const sel = await open({ multiple: false });
+    if (typeof sel === "string") hashFile(sel);
+  }
+
+  // 拖入文件直接计算;进度与取消复用全局任务槽
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    getCurrentWebview()
+      .onDragDropEvent((event) => {
+        const p = event.payload;
+        if (p.type === "enter" || p.type === "over") setFileDrag(true);
+        else if (p.type === "leave") setFileDrag(false);
+        else if (p.type === "drop") {
+          setFileDrag(false);
+          if (p.paths.length && !hashing) hashFile(p.paths[0]);
+        }
+      })
+      .then((fn) => {
+        if (cancelled) fn();
+        else unlisten = fn;
+      });
+    const un = listen<{ done: number; total: number }>("hashfile://progress", (e) => {
+      const { done, total } = e.payload;
+      setHashPct(total > 0 ? Math.min(100, (done / total) * 100) : 0);
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+      un.then((fn) => fn());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function cancelHash() {
+    await invoke("sb_cancel").catch(() => {});
+  }
 
   async function compute() {
     try {
@@ -359,7 +441,67 @@ function HashTool() {
   return (
     <div className="stack">
       <div className="field">
-        <span className="field-label">输入文本（按 UTF-8 计算）</span>
+        <span className="field-label">文件校验（完整读取计算，大小不限，数据不出本机）</span>
+        <div
+          className={`dropzone dropzone-sm${fileDrag ? " over" : ""}`}
+          onClick={pickFile}
+          role="button"
+        >
+          {fileName ? (
+            <>
+              <div className="dropzone-title" title={fileName}>
+                {baseName(fileName)}
+              </div>
+              <div className="dropzone-sub">
+                {hashing
+                  ? `计算中 ${hashPct.toFixed(0)}%`
+                  : fileRes
+                    ? `完成 · ${fmtBytes(fileRes.size)}`
+                    : ""}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="dropzone-title">拖入文件到此处，或点击选择</div>
+              <div className="dropzone-sub">下载文件验完整性用，只在本机计算</div>
+            </>
+          )}
+          {hashing && (
+            <div className="progress-track" style={{ width: "60%", marginTop: 10 }}>
+              <div className="progress-fill" style={{ width: `${hashPct}%` }} />
+            </div>
+          )}
+        </div>
+        {hashing && (
+          <div className="tool-actions">
+            <button className="btn" onClick={cancelHash}>
+              取消
+            </button>
+          </div>
+        )}
+      </div>
+
+      {fileRes && (
+        <>
+          {[
+            ["MD5", fileRes.md5],
+            ["SHA-1", fileRes.sha1],
+            ["SHA-256", fileRes.sha256],
+            ["SHA-512", fileRes.sha512],
+          ].map(([algo, value]) => (
+            <div className="hash-row" key={algo}>
+              <div className="hash-head">
+                <span className="hash-algo">{algo}</span>
+                <CopyButton text={value} />
+              </div>
+              <div className="hash-value">{value}</div>
+            </div>
+          ))}
+        </>
+      )}
+
+      <div className="field" style={{ marginTop: 8 }}>
+        <span className="field-label">文本哈希（按 UTF-8 计算）</span>
         <textarea
           className="textarea"
           value={input}

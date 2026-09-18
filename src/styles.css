@@ -789,6 +789,9 @@ body {
   background: var(--fill);
 }
 
+.dropzone-sm { padding: 18px; gap: 4px; }
+.dropzone-sm .progress-track { max-width: 420px; }
+
 /* 选中态按钮(与普通按钮同高) */
 .btn-selected {
   border-color: var(--primary);

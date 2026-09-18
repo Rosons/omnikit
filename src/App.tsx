@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useState } from "react";
 import { tools } from "./tools/registry";
+import { ToastHost } from "./components/Toast";
 
 export default function App() {
   const [activeId, setActiveId] = useState(tools[0].id);
@@ -72,6 +73,7 @@ export default function App() {
           </Suspense>
         </div>
       </main>
+      <ToastHost />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { fmtBytes, fmtTime } from "../../lib/format";
 import { requestDecrypt } from "../../lib/bus";
+import { showToast } from "../../components/Toast";
 
 interface HistoryEntry {
   id: number;
@@ -25,19 +26,27 @@ export default function History() {
   }, []);
 
   async function remove(id: number) {
-    await invoke("sb_history_remove", { id }).catch(() => {});
-    setEntries((es) => es?.filter((e) => e.id !== id) ?? null);
+    try {
+      await invoke("sb_history_remove", { id });
+      setEntries((es) => es?.filter((e) => e.id !== id) ?? null);
+    } catch (e) {
+      showToast(String(e), "error");
+    }
   }
 
   async function clearAll() {
-    await invoke("sb_history_clear").catch(() => {});
-    setEntries([]);
-    setConfirmingClear(false);
+    try {
+      await invoke("sb_history_clear");
+      setEntries([]);
+      setConfirmingClear(false);
+    } catch (e) {
+      showToast(String(e), "error");
+    }
   }
 
   function reveal(entry: HistoryEntry) {
     invoke("sb_reveal", { path: entry.kind === "encrypt" ? entry.boxPath : entry.location }).catch(
-      () => {}
+      (e) => showToast(String(e), "error")
     );
   }
 

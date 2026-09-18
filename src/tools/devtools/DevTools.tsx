@@ -393,9 +393,11 @@ function HashTool() {
         {error && <span className="hint hint-error">{error}</span>}
       </div>
       {hashes.map((h) => (
-        <div className="kv-row" key={h.algo}>
-          <span style={{ flex: "none", fontWeight: 600 }}>{h.algo}</span>
-          <span className="kv-value">{h.value}</span>
+        <div className="hash-row" key={h.algo}>
+          <span className="hash-algo">{h.algo}</span>
+          <span className="hash-value" title={h.value}>
+            {h.value}
+          </span>
           <CopyButton text={h.value} />
         </div>
       ))}

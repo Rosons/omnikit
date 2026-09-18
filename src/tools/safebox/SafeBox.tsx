@@ -5,6 +5,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { fmtBytes, fmtDuration } from "../../lib/format";
 import { peekDecryptPrefill } from "../../lib/bus";
+import { showToast } from "../../components/Toast";
 
 interface ProgressEvent {
   phase: "pack" | "unpack";
@@ -163,7 +164,7 @@ export default function SafeBox() {
       setError("");
     } catch (e) {
       if (seq !== scanSeqRef.current) return;
-      setError(String(e));
+      showToast(String(e), "error");
       setScanned(null);
     } finally {
       if (seq === scanSeqRef.current) setScanning(false);
@@ -370,7 +371,7 @@ export default function SafeBox() {
     try {
       await invoke("sb_reveal", { path });
     } catch (e) {
-      setError(String(e));
+      showToast(String(e), "error");
     }
   }
 

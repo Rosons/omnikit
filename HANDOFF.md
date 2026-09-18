@@ -131,6 +131,13 @@ devtoolbox/
   - 每行=行号槽(42px 右对齐)+ +/− 标记 + 内容(pre-wrap 自动换行,不出横向滚动);完全一致显示「两段内容完全一致」;超 4000 行截断
   - `.diff-no/.diff-mark/.diff-line` 类名保留但语义变为 cell 内元素,旧的 `.diff-out/.diff-row/.diff-grid` 已删
 
+### v0.1.4 对比展示进阶(2026-09-19,用户确认后实现)
+- **词级高亮**:配对的删除/新增行再做 `diffWords`(任一侧含 CJK 改用 `diffChars`)行内比对,变化片段用 `<mark class="w-del|w-add">` 加深(红 #ffc9c7/绿 #b4ecc9),未变部分保持行底色;行超过 400 字符跳过词级(防卡)
+- **相同段落折叠**:连续上下文行 >10 时留头尾各 3 行,中间折叠为「展开中间相同的 N 行」按钮(`.diff-fold`,虚线上下框);展开状态存 `expanded: Set<foldId>`(id=折叠首行 key,重算后自然失效);两段完全一致时不折叠
+- **差异导航+滚动条标记**:连续增删块为一「差异组」,组首行带 `data-chg=组号`;渲染后 `useLayoutEffect` 量测各组 `offsetTop/scrollHeight` 百分比 → 右缘 `.diff-rail` 上放 `.diff-marker`(mod 橙/del 红/add 绿,点击跳转);右上角 `.diff-nav` 圆胶囊「▲ n/N ▼」上下跳转,当前组行左缘蓝色竖条(`.chg-cur` inset box-shadow);进入对比视图自动定位到第一处差异
+- 跳转定位 `el.offsetTop - 72`(露出上文);`.diff-scroll` 加 `position:relative` 作 offsetParent;外层 `.diff-wrap`(relative)承载 nav/rail 浮层
+- 已修过的坑:① 对比结果未就绪时渲染空指针白屏 → 点击即算+空值守卫;② qrcode 库 `toCanvas` 会写内联 `style.width=640px` 顶掉 CSS → 绘制后 JS 显式设回 320px
+
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)
 

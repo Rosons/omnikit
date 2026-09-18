@@ -1,22 +1,37 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { diffLines } from "diff";
+import { diffChars, diffLines, diffWords } from "diff";
 import { showToast } from "../../components/Toast";
 
+interface Seg {
+  t: string;
+  chg: boolean;
+}
 interface Cell {
   no: number;
   text: string;
   type: "ctx" | "del" | "add";
+  segs?: Seg[];
 }
 /** 左右对齐的一行:某侧为 null 表示另一侧独有(删除/新增),用灰底补位 */
 interface Pair {
   l: Cell | null;
   r: Cell | null;
+  key: number;
+  /** 所属差异组序号(仅该组首行携带) */
+  g?: number;
+  gStart?: boolean;
+  gType?: "mod" | "del" | "add";
 }
+type Block =
+  | { kind: "rows"; pairs: Pair[] }
+  | { kind: "fold"; id: number; count: number; hidden: Pair[] };
+type Item = { kind: "pair"; p: Pair } | { kind: "fold"; id: number; count: number };
 
 const MAX_CHARS = 2_000_000;
-const MAX_PAIRS = 4000;
+const FOLD_MIN = 10;
+const FOLD_KEEP = 3;
 
 const TEXT_FILTERS = [
   {
@@ -29,17 +44,60 @@ const TEXT_FILTERS = [
   },
 ];
 
+/** 行内词级比对:标出这一行里具体改了哪几个词;中文无词边界改用字符级 */
+function intraSegs(a: string, b: string): [Seg[], Seg[]] | null {
+  if (a === b || a.length > 400 || b.length > 400) return null;
+  const hasCJK = /[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(a + b);
+  const parts = hasCJK ? diffChars(a, b) : diffWords(a, b);
+  const ls: Seg[] = [];
+  const rs: Seg[] = [];
+  for (const pt of parts) {
+    if (pt.added) rs.push({ t: pt.value, chg: true });
+    else if (pt.removed) ls.push({ t: pt.value, chg: true });
+    else {
+      ls.push({ t: pt.value, chg: false });
+      rs.push({ t: pt.value, chg: false });
+    }
+  }
+  return [ls, rs];
+}
+
+/** 行内容渲染:有词级结果时仅加深变化片段 */
+function LineText({ cell, strong }: { cell: Cell; strong: "del" | "add" }) {
+  if (!cell.segs || cell.segs.length === 0) {
+    return <>{cell.text === "" ? "\u00A0" : cell.text}</>;
+  }
+  return (
+    <>
+      {cell.segs.map((s, i) =>
+        s.chg ? (
+          <mark key={i} className={strong === "del" ? "w-del" : "w-add"}>
+            {s.t}
+          </mark>
+        ) : (
+          <span key={i}>{s.t}</span>
+        ),
+      )}
+    </>
+  );
+}
+
 export default function DiffTool() {
   const [left, setLeft] = useState("");
   const [right, setRight] = useState("");
   const [mode, setMode] = useState<"edit" | "diff">("edit");
-  const [pairs, setPairs] = useState<Pair[] | null>(null);
+  const [blocks, setBlocks] = useState<Block[] | null>(null);
   const [stats, setStats] = useState({ add: 0, del: 0 });
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [groups, setGroups] = useState(0);
+  const [chgPos, setChgPos] = useState(-1);
+  const [marks, setMarks] = useState<{ pct: number; type: string }[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const timer = useRef<number | undefined>(undefined);
 
   function compute() {
     if (left.length > MAX_CHARS || right.length > MAX_CHARS) {
-      setPairs(null);
+      setBlocks(null);
       showToast("文本超过 2MB，请截取片段后比较", "error", 5000);
       return;
     }
@@ -48,11 +106,14 @@ export default function DiffTool() {
       if (ls.length && ls[ls.length - 1] === "") ls.pop();
       return ls;
     };
-    const out: Pair[] = [];
+    const flat: Pair[] = [];
+    let key = 0;
     let oldNo = 0;
     let newNo = 0;
     let add = 0;
     let del = 0;
+    let g = -1;
+    let inChange = false;
     let dels: string[] = [];
     let adds: string[] = [];
     const flush = () => {
@@ -60,9 +121,30 @@ export default function DiffTool() {
       del += dels.length;
       const n = Math.max(dels.length, adds.length);
       for (let i = 0; i < n; i++) {
-        out.push({
-          l: i < dels.length ? { no: ++oldNo, text: dels[i], type: "del" } : null,
-          r: i < adds.length ? { no: ++newNo, text: adds[i], type: "add" } : null,
+        let gStart = false;
+        if (!inChange) {
+          g++;
+          inChange = true;
+          gStart = true;
+        }
+        const l: Cell | null =
+          i < dels.length ? { no: ++oldNo, text: dels[i], type: "del" } : null;
+        const r: Cell | null =
+          i < adds.length ? { no: ++newNo, text: adds[i], type: "add" } : null;
+        if (l && r) {
+          const segs = intraSegs(dels[i], adds[i]);
+          if (segs) {
+            l.segs = segs[0];
+            r.segs = segs[1];
+          }
+        }
+        flat.push({
+          l,
+          r,
+          key: key++,
+          g: gStart ? g : undefined,
+          gStart: gStart || undefined,
+          gType: l && r ? "mod" : l ? "del" : "add",
         });
       }
       dels = [];
@@ -74,19 +156,65 @@ export default function DiffTool() {
       else {
         flush();
         for (const t of split(ch.value)) {
+          inChange = false;
           oldNo++;
           newNo++;
-          out.push({
+          flat.push({
             l: { no: oldNo, text: t, type: "ctx" },
             r: { no: newNo, text: t, type: "ctx" },
+            key: key++,
           });
         }
       }
     }
     flush();
-    setPairs(out);
+
+    // 长段相同内容折叠为可展开的一行
+    const foldable = add + del > 0;
+    const foldThreshold = foldable ? FOLD_MIN : 4000;
+    const out: Block[] = [];
+    let run: Pair[] = [];
+    const endRun = () => {
+      if (!run.length) return;
+      if (run.length > foldThreshold) {
+        out.push({ kind: "rows", pairs: run.slice(0, FOLD_KEEP) });
+        out.push({
+          kind: "fold",
+          id: run[FOLD_KEEP].key,
+          count: run.length - FOLD_KEEP * 2,
+          hidden: run.slice(FOLD_KEEP, -FOLD_KEEP),
+        });
+        out.push({ kind: "rows", pairs: run.slice(-FOLD_KEEP) });
+      } else {
+        out.push({ kind: "rows", pairs: run });
+      }
+      run = [];
+    };
+    for (const p of flat) {
+      if (p.l?.type === "ctx") run.push(p);
+      else {
+        endRun();
+        out.push({ kind: "rows", pairs: [p] });
+      }
+    }
+    endRun();
+
+    setBlocks(out);
     setStats({ add, del });
+    setGroups(g + 1);
+    setChgPos(-1);
   }
+
+  const items = useMemo<Item[]>(() => {
+    if (!blocks) return [];
+    const list: Item[] = [];
+    for (const b of blocks) {
+      if (b.kind === "rows") for (const p of b.pairs) list.push({ kind: "pair", p });
+      else if (expanded.has(b.id)) for (const p of b.hidden) list.push({ kind: "pair", p });
+      else list.push({ kind: "fold", id: b.id, count: b.count });
+    }
+    return list;
+  }, [blocks, expanded]);
 
   // 对比模式下内容变化(载入文件、左右交换)自动重算,结果实时刷新
   useEffect(() => {
@@ -96,6 +224,43 @@ export default function DiffTool() {
     return () => window.clearTimeout(timer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [left, right, mode]);
+
+  // 渲染后测量每处差异的真实位置:滚动条标记 + 首次自动定位到第一处
+  useLayoutEffect(() => {
+    const c = scrollRef.current;
+    if (mode !== "diff" || !c) {
+      setMarks([]);
+      return;
+    }
+    const els = Array.from(c.querySelectorAll<HTMLElement>("[data-chg]"));
+    const total = c.scrollHeight || 1;
+    setMarks(
+      els.map((el) => ({
+        pct: Math.min(1, el.offsetTop / total),
+        type: el.dataset.chgType || "mod",
+      })),
+    );
+    if (chgPos === -1 && els.length > 0) {
+      setChgPos(0);
+      c.scrollTo({ top: Math.max(0, els[0].offsetTop - 72) });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, mode]);
+
+  function scrollToGroup(i: number) {
+    const c = scrollRef.current;
+    if (!c) return;
+    const el = c.querySelector<HTMLElement>(`[data-chg="${i}"]`);
+    if (el) c.scrollTo({ top: Math.max(0, el.offsetTop - 72), behavior: "smooth" });
+  }
+
+  function go(delta: number) {
+    if (groups === 0) return;
+    const next = Math.min(groups - 1, Math.max(0, chgPos + delta));
+    if (next === chgPos) return;
+    setChgPos(next);
+    scrollToGroup(next);
+  }
 
   async function loadFile(side: "left" | "right") {
     const sel = await open({ multiple: false, filters: TEXT_FILTERS });
@@ -118,11 +283,49 @@ export default function DiffTool() {
     setLeft("");
     setRight("");
     setMode("edit");
-    setPairs(null);
+    setBlocks(null);
+    setExpanded(new Set());
+    setGroups(0);
+    setChgPos(-1);
   }
 
-  const shown = pairs ? pairs.slice(0, MAX_PAIRS) : null;
-  const same = mode === "diff" && pairs !== null && stats.add === 0 && stats.del === 0;
+  const same = mode === "diff" && blocks !== null && stats.add === 0 && stats.del === 0;
+
+  function renderPair(p: Pair) {
+    const cur = p.gStart && p.g === chgPos;
+    const cls = cur ? " chg-cur" : "";
+    const mark = p.gStart ? { "data-chg": p.g, "data-chg-type": p.gType } : undefined;
+    return (
+      <Fragment key={p.key}>
+        {p.l ? (
+          <div className={`diff-cell ${p.l.type}${cls}`} {...(mark as object)}>
+            <span className="diff-no">{p.l.no}</span>
+            <span className="diff-mark">−</span>
+            <span className="diff-line">
+              <LineText cell={p.l} strong="del" />
+            </span>
+          </div>
+        ) : (
+          <div className="diff-cell filler">
+            <span className="diff-line">{"\u00A0"}</span>
+          </div>
+        )}
+        {p.r ? (
+          <div className={`diff-cell ${p.r.type}${cls}`} {...(p.l ? undefined : (mark as object))}>
+            <span className="diff-no">{p.r.no}</span>
+            <span className="diff-mark">+</span>
+            <span className="diff-line">
+              <LineText cell={p.r} strong="add" />
+            </span>
+          </div>
+        ) : (
+          <div className="diff-cell filler">
+            <span className="diff-line">{"\u00A0"}</span>
+          </div>
+        )}
+      </Fragment>
+    );
+  }
 
   return (
     <div className="stack">
@@ -159,39 +362,56 @@ export default function DiffTool() {
             />
           </div>
         ) : (
-          <div className="diff-scroll">
-            <div className="diff-grid2">
-              {shown &&
-                shown.map((p, i) => (
-                <Fragment key={i}>
-                  {p.l ? (
-                    <div className={`diff-cell ${p.l.type}`}>
-                      <span className="diff-no">{p.l.no}</span>
-                      <span className="diff-mark">−</span>
-                      <span className="diff-line">{p.l.text === "" ? "\u00A0" : p.l.text}</span>
-                    </div>
+          <div className="diff-wrap">
+            <div className="diff-scroll" ref={scrollRef}>
+              <div className="diff-grid2">
+                {items.map((it) =>
+                  it.kind === "fold" ? (
+                    <button
+                      key={it.id}
+                      className="diff-fold"
+                      onClick={() => setExpanded((s) => new Set(s).add(it.id))}
+                    >
+                      展开中间相同的 {it.count} 行
+                    </button>
                   ) : (
-                    <div className="diff-cell filler">
-                      <span className="diff-line">{"\u00A0"}</span>
-                    </div>
-                  )}
-                  {p.r ? (
-                    <div className={`diff-cell ${p.r.type}`}>
-                      <span className="diff-no">{p.r.no}</span>
-                      <span className="diff-mark">+</span>
-                      <span className="diff-line">{p.r.text === "" ? "\u00A0" : p.r.text}</span>
-                    </div>
-                  ) : (
-                    <div className="diff-cell filler">
-                      <span className="diff-line">{"\u00A0"}</span>
-                    </div>
-                  )}
-                </Fragment>
-              ))}
-              {pairs && pairs.length > MAX_PAIRS && (
-                <div className="diff-more">结果过长，仅显示前 {MAX_PAIRS} 行</div>
-              )}
+                    renderPair(it.p)
+                  ),
+                )}
+                {blocks && blocks.length === 0 && (
+                  <div className="diff-empty">没有内容</div>
+                )}
+              </div>
             </div>
+            {groups > 0 && (
+              <div className="diff-nav">
+                <button className="btn-text" onClick={() => go(-1)} disabled={chgPos <= 0}>
+                  ▲
+                </button>
+                <span className="diff-nav-pos">
+                  {chgPos + 1}/{groups}
+                </span>
+                <button
+                  className="btn-text"
+                  onClick={() => go(1)}
+                  disabled={chgPos >= groups - 1}
+                >
+                  ▼
+                </button>
+              </div>
+            )}
+            {marks.length > 0 && (
+              <div className="diff-rail">
+                {marks.map((m, i) => (
+                  <span
+                    key={i}
+                    className={`diff-marker ${m.type}`}
+                    style={{ top: `${m.pct * 100}%` }}
+                    onClick={() => scrollToGroup(i)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -219,7 +439,7 @@ export default function DiffTool() {
           清空
         </button>
         {same && <span className="hint hint-ok">两段内容完全一致</span>}
-        {mode === "diff" && pairs !== null && !same && (
+        {mode === "diff" && blocks !== null && !same && (
           <span className="diff-stats">
             <span className="diff-stat-add">+{stats.add}</span>
             <span className="diff-stat-del">−{stats.del}</span>

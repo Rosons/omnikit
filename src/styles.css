@@ -923,7 +923,15 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
   background: var(--card);
+  position: relative;
 }
+.diff-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.diff-wrap .diff-scroll { flex: 1; }
 .diff-grid2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -966,6 +974,90 @@ body {
   font-size: 12px;
   color: var(--text-3);
 }
+.diff-empty {
+  grid-column: 1 / -1;
+  padding: 24px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+/* 词级高亮:行内具体变化的词加深 */
+.diff-cell mark {
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.diff-cell .w-del { background: #ffc9c7; }
+.diff-cell .w-add { background: #b4ecc9; }
+
+/* 当前定位的差异组:左缘蓝色竖条 */
+.diff-cell.chg-cur { box-shadow: inset 2px 0 0 var(--primary); }
+
+/* 折叠相同段落 */
+.diff-fold {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0;
+  background: var(--fill);
+  border: none;
+  border-top: 1px dashed var(--border-strong);
+  border-bottom: 1px dashed var(--border-strong);
+  color: var(--text-2);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.diff-fold:hover { background: var(--primary-dim); color: var(--primary); }
+
+/* 差异导航与滚动条标记 */
+.diff-nav {
+  position: absolute;
+  top: 8px;
+  right: 18px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 4px;
+  box-shadow: 0 2px 10px rgba(31, 35, 41, 0.1);
+  font-size: 12px;
+}
+.diff-nav .btn-text { padding: 2px 6px; }
+.diff-nav-pos {
+  min-width: 44px;
+  text-align: center;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.diff-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 16px;
+  width: 6px;
+  z-index: 3;
+  pointer-events: none;
+}
+.diff-marker {
+  position: absolute;
+  left: 0;
+  width: 6px;
+  height: 5px;
+  border-radius: 2px;
+  transform: translateY(-50%);
+  pointer-events: auto;
+  cursor: pointer;
+}
+.diff-marker:hover { transform: translateY(-50%) scaleX(1.6); }
+.diff-marker.mod { background: #f59e0b; }
+.diff-marker.del { background: var(--danger); }
+.diff-marker.add { background: var(--success); }
 .diff-stats {
   display: inline-flex;
   gap: 10px;

@@ -164,6 +164,15 @@ export default function DiffTool() {
   const [marks, setMarks] = useState<{ pct: number; type: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const timer = useRef<number | undefined>(undefined);
+  const [flashing, setFlashing] = useState(false);
+  const flashTimer = useRef<number | undefined>(undefined);
+
+  // 跳转后短暂强高亮,帮助视线定位当前差异
+  function flash() {
+    setFlashing(true);
+    window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => setFlashing(false), 700);
+  }
 
   function compute() {
     if (left.length > MAX_CHARS || right.length > MAX_CHARS) {
@@ -208,7 +217,7 @@ export default function DiffTool() {
           l,
           r,
           key: key++,
-          g: gStart ? g : undefined,
+          g,
           gStart: gStart || undefined,
           gType: l && r ? "mod" : l ? "del" : "add",
         });
@@ -322,11 +331,13 @@ export default function DiffTool() {
     if (chgPos === -1 && els.length > 0) {
       setChgPos(0);
       c.scrollTo({ top: Math.max(0, els[0].offsetTop - 72) });
+      flash();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, mode]);
 
   function scrollToGroup(i: number) {
+    flash();
     const c = scrollRef.current;
     if (!c) return;
     const el = c.querySelector<HTMLElement>(`[data-chg="${i}"]`);
@@ -371,8 +382,8 @@ export default function DiffTool() {
   const same = mode === "diff" && blocks !== null && stats.add === 0 && stats.del === 0;
 
   function renderPair(p: Pair) {
-    const cur = p.gStart && p.g === chgPos;
-    const cls = cur ? " chg-cur" : "";
+    const cur = p.g !== undefined && p.g === chgPos;
+    const cls = cur ? ` chg-cur${flashing ? " chg-flash" : ""}` : "";
     const mark = p.gStart ? { "data-chg": p.g, "data-chg-type": p.gType } : undefined;
     return (
       <Fragment key={p.key}>
@@ -385,7 +396,7 @@ export default function DiffTool() {
             </span>
           </div>
         ) : (
-          <div className="diff-cell filler">
+          <div className={`diff-cell filler${cls}`}>
             <span className="diff-line">{"\u00A0"}</span>
           </div>
         )}
@@ -398,7 +409,7 @@ export default function DiffTool() {
             </span>
           </div>
         ) : (
-          <div className="diff-cell filler">
+          <div className={`diff-cell filler${cls}`}>
             <span className="diff-line">{"\u00A0"}</span>
           </div>
         )}
@@ -518,7 +529,7 @@ export default function DiffTool() {
                 {marks.map((m, i) => (
                   <span
                     key={i}
-                    className={`diff-marker ${m.type}`}
+                    className={`diff-marker ${m.type}${i === chgPos ? " cur" : ""}`}
                     style={{ top: `${m.pct * 100}%` }}
                     onClick={() => scrollToGroup(i)}
                   />

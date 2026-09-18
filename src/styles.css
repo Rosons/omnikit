@@ -1018,23 +1018,31 @@ body {
 /* 当前定位的差异组:左缘蓝色竖条 */
 .diff-cell.chg-cur { box-shadow: inset 2px 0 0 var(--primary); }
 
-/* 折叠相同段落 */
+/* 折叠相同段落:两侧细线 + 居中小胶囊按钮 */
 .diff-fold {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 4px 0;
-  background: var(--fill);
-  border: none;
-  border-top: 1px dashed var(--border-strong);
-  border-bottom: 1px dashed var(--border-strong);
-  color: var(--text-2);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
+  gap: 12px;
+  padding: 5px 16px;
 }
-.diff-fold:hover { background: var(--primary-dim); color: var(--primary); }
+.diff-fold-line { flex: 1; height: 1px; background: var(--border); }
+.diff-fold-btn {
+  padding: 3px 14px;
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: var(--fast);
+}
+.diff-fold-btn:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--primary-dim);
+}
 
 /* 差异导航与滚动条标记 */
 .diff-nav {

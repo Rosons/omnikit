@@ -199,19 +199,31 @@ export default function DiffTool() {
       dels = [];
       adds = [];
     };
+    // 相同行要分别取左右各自的原文(忽略大小写等规则只用于比较,不改显示)
+    let lp = 0;
+    let rp = 0;
     for (const ch of changes) {
-      if (ch.added) adds.push(...ch.value);
-      else if (ch.removed) dels.push(...ch.value);
-      else {
+      if (ch.added) {
+        adds.push(...ch.value);
+        rp += ch.count ?? ch.value.length;
+      } else if (ch.removed) {
+        dels.push(...ch.value);
+        lp += ch.count ?? ch.value.length;
+      } else {
         flush();
-        for (const it of ch.value) {
+        const n = ch.count ?? ch.value.length;
+        for (let i = 0; i < n; i++) {
+          const a = L[lp + i];
+          const b = R[rp + i];
           inChange = false;
           flat.push({
-            l: { no: it.no, text: it.text, type: "ctx" },
-            r: { no: it.no, text: it.text, type: "ctx" },
+            l: a ? { no: a.no, text: a.text, type: "ctx" } : null,
+            r: b ? { no: b.no, text: b.text, type: "ctx" } : null,
             key: key++,
           });
         }
+        lp += n;
+        rp += n;
       }
     }
     flush();
@@ -427,13 +439,16 @@ export default function DiffTool() {
               <div className="diff-grid2">
                 {items.map((it) =>
                   it.kind === "fold" ? (
-                    <button
-                      key={it.id}
-                      className="diff-fold"
-                      onClick={() => setExpanded((s) => new Set(s).add(it.id))}
-                    >
-                      展开中间相同的 {it.count} 行
-                    </button>
+                    <div key={it.id} className="diff-fold">
+                      <span className="diff-fold-line" />
+                      <button
+                        className="diff-fold-btn"
+                        onClick={() => setExpanded((s) => new Set(s).add(it.id))}
+                      >
+                        展开中间相同的 {it.count} 行 ⌄
+                      </button>
+                      <span className="diff-fold-line" />
+                    </div>
                   ) : (
                     renderPair(it.p)
                   ),

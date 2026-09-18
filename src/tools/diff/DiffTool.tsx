@@ -161,7 +161,8 @@ export default function DiffTool() {
         ) : (
           <div className="diff-scroll">
             <div className="diff-grid2">
-              {shown!.map((p, i) => (
+              {shown &&
+                shown.map((p, i) => (
                 <Fragment key={i}>
                   {p.l ? (
                     <div className={`diff-cell ${p.l.type}`}>
@@ -198,7 +199,10 @@ export default function DiffTool() {
         {mode === "edit" ? (
           <button
             className="btn btn-primary"
-            onClick={() => setMode("diff")}
+            onClick={() => {
+              compute();
+              setMode("diff");
+            }}
             disabled={!left && !right}
           >
             开始对比

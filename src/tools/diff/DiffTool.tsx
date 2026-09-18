@@ -117,8 +117,22 @@ function intraSegs(a: string, b: string): [Seg[], Seg[]] | null {
   return [ls, rs];
 }
 
-/** 行内容渲染:有词级结果时仅加深变化片段 */
-function LineText({ cell, strong }: { cell: Cell; strong: "del" | "add" }) {
+/** 折叠按钮的小箭头:文字箭头(⌄/⌃)字体基线不齐,用 SVG 保证垂直居中 */
+function Chev({ up }: { up?: boolean }) {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden style={{ flex: "none" }}>
+      <polyline
+        points={up ? "2,6.4 5,3.4 8,6.4" : "2,3.6 5,6.6 8,3.6"}
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** 行内容渲染:有词级结果时仅加深变化片段 */function LineText({ cell, strong }: { cell: Cell; strong: "del" | "add" }) {
   if (!cell.segs || cell.segs.length === 0) {
     return <>{cell.text === "" ? "\u00A0" : cell.text}</>;
   }
@@ -450,7 +464,8 @@ export default function DiffTool() {
                         className="diff-fold-btn"
                         onClick={() => setExpanded((s) => new Set(s).add(it.id))}
                       >
-                        展开中间相同的 {it.count} 行 ⌄
+                        展开中间相同的 {it.count} 行
+                        <Chev />
                       </button>
                       <span className="diff-fold-line" />
                     </div>
@@ -467,7 +482,8 @@ export default function DiffTool() {
                           })
                         }
                       >
-                        收起相同的 {it.count} 行 ⌃
+                        收起相同的 {it.count} 行
+                        <Chev up />
                       </button>
                       <span className="diff-fold-line" />
                     </div>

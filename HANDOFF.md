@@ -159,6 +159,7 @@ devtoolbox/
 - 新样式:port-head/port-row(与表头同网格)、regex-view/re-list、kv-list/kv-row(通用键值行)、jwt-chip、cron-table、pw-list/pw-row、input-error;新图标(PortIcon 网口三针/RegexIcon 点+星号/ClockIcon 时钟/KeyIcon 钥匙,均双色实心,registry.tsx)
 - **工具布局调整(用户反馈)**:「JWT·Cron」合并菜单被否 → **Cron 独立成工具**(id `cron`,`src/tools/cron/CronTool.tsx`,内含解析/生成子页);**JWT 并入「开发小工具」第六个子 Tab**(DevTools.tsx 内 JwtTool,以后的小工具也加在这里);netstat/tasklist/taskkill 加 `CREATE_NO_WINDOW`(`hidden_command` 辅助)消除黑窗闪烁
 - 端口页曾因「数据未加载时 filtered 为 null 直接 .map」白屏一次(diff 页同类问题第二次出现)——**教训:渲染列表永远不要用 `!` 非空断言,一律 `xxx &&` 守卫**
+- **端口行可展开进程详情**(用户要求):`process_details()` 改用 **sysinfo 0.33** 一次读取全部进程(name/exe/cmd/memory/start_time,替代 tasklist 文本解析),PortEntry 扩展 name/path/cmd/mem/start 字段;前端点击行展开 `.port-detail`(进程/路径/命令行/启动时间/内存/打开所在文件夹——复用 sb_reveal),行点击与内部按钮 stopPropagation;系统进程路径可能取不到(权限),显示「不可获取」
 
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)

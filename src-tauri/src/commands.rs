@@ -584,7 +584,11 @@ pub struct PortEntry {
     pub address: String,
     pub port: u16,
     pub pid: u32,
-    pub process: String,
+    pub name: String,
+    pub path: Option<String>,
+    pub cmd: Option<String>,
+    pub mem: u64,
+    pub start: u64,
 }
 
 /// 解析 netstat -ano 输出:仅保留 TCP LISTENING 与全部 UDP 行
@@ -609,7 +613,11 @@ fn parse_netstat(output: &str) -> Vec<PortEntry> {
                             address,
                             port,
                             pid,
-                            process: String::new(),
+                            name: String::new(),
+                            path: None,
+                            cmd: None,
+                            mem: 0,
+                            start: 0,
                         });
                     }
                 }
@@ -622,7 +630,11 @@ fn parse_netstat(output: &str) -> Vec<PortEntry> {
                             address,
                             port,
                             pid,
-                            process: String::new(),
+                            name: String::new(),
+                            path: None,
+                            cmd: None,
+                            mem: 0,
+                            start: 0,
                         });
                     }
                 }
@@ -639,21 +651,47 @@ fn run_gbk_cmd(program: &str, args: &[&str]) -> std::io::Result<String> {
     Ok(text.into_owned())
 }
 
-fn process_names() -> std::collections::HashMap<u32, String> {
+struct ProcDetail {
+    name: String,
+    path: Option<String>,
+    cmd: Option<String>,
+    mem: u64,
+    start: u64,
+}
+
+/// 用 sysinfo 一次性读取全部进程的名称/路径/命令行/内存/启动时间
+fn process_details() -> std::collections::HashMap<u32, ProcDetail> {
+    use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
     let mut map = std::collections::HashMap::new();
-    if let Ok(text) = run_gbk_cmd("tasklist", &["/fo", "csv", "/nh"]) {
-        for line in text.lines() {
-            let line = line.trim();
-            if !line.starts_with('"') {
-                continue;
-            }
-            let parts: Vec<&str> = line.split("\",\"").collect();
-            if parts.len() >= 2 {
-                if let Ok(pid) = parts[1].parse::<u32>() {
-                    map.insert(pid, parts[0].trim_start_matches('"').to_string());
-                }
-            }
-        }
+    let mut sys = System::new();
+    sys.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        true,
+        ProcessRefreshKind::nothing()
+            .with_exe(UpdateKind::Always)
+            .with_cmd(UpdateKind::Always),
+    );
+    for (pid, p) in sys.processes() {
+        let cmd = p.cmd();
+        map.insert(
+            pid.as_u32(),
+            ProcDetail {
+                name: p.name().to_string_lossy().into_owned(),
+                path: p.exe().map(|e| e.to_string_lossy().into_owned()),
+                cmd: if cmd.is_empty() {
+                    None
+                } else {
+                    Some(
+                        cmd.iter()
+                            .map(|s| s.to_string_lossy().into_owned())
+                            .collect::<Vec<_>>()
+                            .join(" "),
+                    )
+                },
+                mem: p.memory(),
+                start: p.start_time(),
+            },
+        );
     }
     map
 }
@@ -661,12 +699,18 @@ fn process_names() -> std::collections::HashMap<u32, String> {
 fn list_ports_impl() -> Result<Vec<PortEntry>, String> {
     let text = run_gbk_cmd("netstat", &["-ano"]).map_err(|e| format!("无法执行 netstat：{e}"))?;
     let mut entries = parse_netstat(&text);
-    let names = process_names();
+    let details = process_details();
     for e in entries.iter_mut() {
-        e.process = names
-            .get(&e.pid)
-            .cloned()
-            .unwrap_or_else(|| "未知进程".into());
+        if let Some(d) = details.get(&e.pid) {
+            e.name = d.name.clone();
+            e.path = d.path.clone();
+            e.cmd = d.cmd.clone();
+            e.mem = d.mem;
+            e.start = d.start;
+        }
+        if e.name.is_empty() {
+            e.name = "未知进程".into();
+        }
     }
     entries.sort_by(|a, b| a.port.cmp(&b.port).then(a.pid.cmp(&b.pid)));
     Ok(entries)

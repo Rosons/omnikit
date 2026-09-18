@@ -1,20 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { showToast } from "../../components/Toast";
+import { fmtBytes, fmtTime } from "../../lib/format";
 
 interface PortRow {
   proto: string;
   address: string;
   port: number;
   pid: number;
-  process: string;
+  name: string;
+  path: string | null;
+  cmd: string | null;
+  mem: number;
+  start: number;
 }
 
 export default function PortTool() {
   const [rows, setRows] = useState<PortRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
+  const [openKey, setOpenKey] = useState<string | null>(null);
 
   async function refresh() {
     setLoading(true);
@@ -39,26 +45,32 @@ export default function PortTool() {
     if (!s) return rows;
     return rows.filter(
       (r) =>
-        r.process.toLowerCase().includes(s) ||
+        r.name.toLowerCase().includes(s) ||
         r.address.toLowerCase().includes(s) ||
         String(r.port) === s ||
         String(r.pid) === s,
     );
   }, [rows, q]);
 
-  async function kill(r: PortRow) {
+  async function kill(r: PortRow, e: MouseEvent) {
+    e.stopPropagation();
     const ok = await confirm(
-      `确定结束进程「${r.process}」（PID ${r.pid}）？该进程会被立即强制关闭。`,
+      `确定结束进程「${r.name}」（PID ${r.pid}）？该进程会被立即强制关闭。`,
       { title: "结束进程", kind: "warning" },
     );
     if (!ok) return;
     try {
       await invoke("net_kill", { pid: r.pid });
-      showToast(`已结束 ${r.process}`, "success");
-    } catch (e) {
-      showToast(String(e), "error", 5000);
+      showToast(`已结束 ${r.name}`, "success");
+    } catch (err) {
+      showToast(String(err), "error", 5000);
     }
     refresh();
+  }
+
+  function reveal(path: string, e: MouseEvent) {
+    e.stopPropagation();
+    invoke("sb_reveal", { path }).catch(() => {});
   }
 
   return (
@@ -101,28 +113,75 @@ export default function PortTool() {
           <div className="port-empty">没有匹配的端口</div>
         )}
         {filtered &&
-          filtered.map((r, i) => (
-          <div className="port-row" key={`${r.proto}-${r.address}-${r.pid}-${i}`}>
-            <span className={`port-proto ${r.proto.toLowerCase()}`}>{r.proto}</span>
-            <span className="port-addr" title={r.address}>
-              {r.address}:{r.port}
-            </span>
-            <span className="port-pid">{r.pid}</span>
-            <span className="port-name" title={r.process}>
-              {r.process}
-            </span>
-            <button
-              className="btn-text port-kill"
-              onClick={() => kill(r)}
-              disabled={r.pid === 0}
-              title={r.pid === 0 ? "系统进程，无法结束" : "结束该进程"}
-            >
-              结束
-            </button>
-          </div>
-        ))}
+          filtered.map((r, i) => {
+            const key = `${r.proto}-${r.address}-${r.pid}-${i}`;
+            const open = openKey === key;
+            return (
+              <Fragment key={key}>
+                <div
+                  className={`port-row${open ? " open" : ""}`}
+                  onClick={() => setOpenKey(open ? null : key)}
+                >
+                  <span className={`port-proto ${r.proto.toLowerCase()}`}>{r.proto}</span>
+                  <span className="port-addr" title={r.address}>
+                    {r.address}:{r.port}
+                  </span>
+                  <span className="port-pid">{r.pid}</span>
+                  <span className="port-name" title={r.name}>
+                    {r.name}
+                  </span>
+                  <button
+                    className="btn-text port-kill"
+                    onClick={(e) => kill(r, e)}
+                    disabled={r.pid === 0}
+                    title={r.pid === 0 ? "系统进程，无法结束" : "结束该进程"}
+                  >
+                    结束
+                  </button>
+                </div>
+                {open && (
+                  <div className="port-detail">
+                    <div className="kv-row">
+                      <span className="kv-k">进程</span>
+                      <span className="kv-v">
+                        {r.name}（PID {r.pid}）
+                      </span>
+                    </div>
+                    <div className="kv-row">
+                      <span className="kv-k">路径</span>
+                      <span className="kv-v kv-mono">
+                        {r.path ?? "（不可获取，常见于系统进程）"}
+                      </span>
+                    </div>
+                    {r.cmd && (
+                      <div className="kv-row">
+                        <span className="kv-k">命令行</span>
+                        <span className="kv-v kv-mono">{r.cmd}</span>
+                      </div>
+                    )}
+                    <div className="kv-row">
+                      <span className="kv-k">启动时间</span>
+                      <span className="kv-v">{r.start ? fmtTime(r.start) : "未知"}</span>
+                    </div>
+                    <div className="kv-row">
+                      <span className="kv-k">内存占用</span>
+                      <span className="kv-v">{fmtBytes(r.mem)}</span>
+                    </div>
+                    {r.path && (
+                      <div className="kv-row">
+                        <span className="kv-k">操作</span>
+                        <button className="btn-text" onClick={(e) => reveal(r.path!, e)}>
+                          打开所在文件夹
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Fragment>
+            );
+          })}
       </div>
-      <div className="hint">仅列出本机监听中的 TCP 端口与 UDP 绑定；结束系统关键进程可能导致异常，请谨慎操作</div>
+      <div className="hint">点击行查看进程详情；仅列出监听中的 TCP 端口与 UDP 绑定，结束系统关键进程请谨慎</div>
     </div>
   );
 }

@@ -1132,9 +1132,24 @@ body {
   height: 42px;
   border-bottom: 1px solid var(--border);
   font-size: 13px;
+  cursor: pointer;
 }
 .port-row:hover { background: var(--fill); }
+.port-row.open { background: var(--primary-dim); }
 .port-row:last-child { border-bottom: none; }
+.port-detail {
+  grid-column: 1 / -1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--fill);
+  margin: 2px 0 8px;
+}
+.kv-mono {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12px;
+  word-break: break-all;
+  min-width: 0;
+}
 .port-proto {
   justify-self: start;
   font-size: 11px;

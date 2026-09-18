@@ -1,0 +1,357 @@
+import { useEffect, useState, type MouseEvent } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { open, confirm } from "@tauri-apps/plugin-dialog";
+import { showToast } from "../../components/Toast";
+import { fmtBytes } from "../../lib/format";
+
+const SUBTABS = [
+  { id: "dupe", name: "重复文件" },
+  { id: "size", name: "大小分析" },
+] as const;
+
+type SubTab = (typeof SUBTABS)[number]["id"];
+
+interface DiskFile {
+  path: string;
+  size: number;
+}
+interface DupeGroup {
+  files: DiskFile[];
+  wasted: number;
+}
+interface DirItem {
+  name: string;
+  path: string;
+  is_dir: boolean;
+  bytes: number;
+  files: number;
+}
+interface DirReport {
+  total_bytes: number;
+  total_files: number;
+  items: DirItem[];
+  largest: DiskFile[];
+}
+
+export default function DiskTool() {
+  const [tab, setTab] = useState<SubTab>("dupe");
+  return (
+    <div>
+      <div className="seg seg-sm" role="tablist">
+        {SUBTABS.map((t) => (
+          <button
+            key={t.id}
+            className={`seg-btn${tab === t.id ? " active" : ""}`}
+            onClick={() => setTab(t.id)}
+          >
+            {t.name}
+          </button>
+        ))}
+      </div>
+      {tab === "dupe" ? <DupeView /> : <SizeView />}
+    </div>
+  );
+}
+
+function reveal(path: string, e: MouseEvent) {
+  e.stopPropagation();
+  invoke("sb_reveal", { path }).catch(() => {});
+}
+
+/* ---------- 重复文件查找 ---------- */
+
+function DupeView() {
+  const [dir, setDir] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState("");
+  const [groups, setGroups] = useState<DupeGroup[] | null>(null);
+
+  useEffect(() => {
+    const un = listen<{ phase: string; done: number; total: number }>("dup://progress", (e) => {
+      const { phase: ph, done, total } = e.payload;
+      setPhase(
+        ph === "scan"
+          ? `扫描中，已发现 ${done} 个文件`
+          : ph === "part"
+            ? `抽样比对 ${done}/${total}`
+            : ph === "hash"
+              ? `完整校验 ${done}/${total}`
+              : "",
+      );
+    });
+    return () => {
+      un.then((fn) => fn());
+    };
+  }, []);
+
+  async function pick() {
+    const sel = await open({ multiple: false, directory: true });
+    if (typeof sel === "string") setDir(sel);
+  }
+
+  async function start() {
+    if (!dir.trim()) {
+      showToast("请先选择要查找的文件夹", "error", 3000);
+      return;
+    }
+    setBusy(true);
+    setGroups(null);
+    try {
+      const r = await invoke<DupeGroup[]>("disk_find_dupes", { root: dir.trim() });
+      setGroups(r);
+    } catch (e) {
+      const msg = String(e);
+      if (msg !== "已取消") showToast(msg, "error", 5000);
+    } finally {
+      setBusy(false);
+      setPhase("");
+    }
+  }
+
+  async function trashFile(path: string, groupIdx: number) {
+    const ok = await confirm(`确定把该文件移入回收站？\n${path}`, {
+      title: "删除文件",
+      kind: "warning",
+    });
+    if (!ok) return;
+    try {
+      await invoke("disk_trash", { path });
+      setGroups((gs) =>
+        gs
+          ? gs
+              .map((g, i) =>
+                i === groupIdx
+                  ? { ...g, files: g.files.filter((f) => f.path !== path) }
+                  : g,
+              )
+              .filter((g) => g.files.length > 1)
+          : gs,
+      );
+      showToast("已移入回收站", "success");
+    } catch (e) {
+      showToast(String(e), "error", 5000);
+    }
+  }
+
+  async function keepFirst(groupIdx: number) {
+    const g = groups?.[groupIdx];
+    if (!g) return;
+    const ok = await confirm(
+      `保留第一个文件，其余 ${g.files.length - 1} 个移入回收站？`,
+      { title: "批量删除", kind: "warning" },
+    );
+    if (!ok) return;
+    try {
+      for (const f of g.files.slice(1)) {
+        await invoke("disk_trash", { path: f.path });
+      }
+      setGroups((gs) => (gs ? gs.filter((_, i) => i !== groupIdx) : gs));
+      showToast(`已移入回收站 ${g.files.length - 1} 个文件`, "success");
+    } catch (e) {
+      showToast(String(e), "error", 5000);
+    }
+  }
+
+  const totalWasted = groups ? groups.reduce((a, g) => a + g.wasted, 0) : 0;
+
+  return (
+    <div className="stack">
+      <div className="tool-actions">
+        <input
+          className="input input-mono http-hv"
+          value={dir}
+          onChange={(e) => setDir(e.target.value)}
+          placeholder="选择要查找的文件夹"
+          spellCheck={false}
+        />
+        <button className="btn btn-sm" onClick={pick}>
+          浏览
+        </button>
+        {busy ? (
+          <button className="btn btn-sm" onClick={() => invoke("sb_cancel").catch(() => {})}>
+            取消
+          </button>
+        ) : (
+          <button className="btn btn-primary btn-sm" onClick={start} disabled={!dir.trim()}>
+            开始查找
+          </button>
+        )}
+        {!busy && groups && (
+          <button className="btn btn-sm" onClick={() => setGroups(null)}>
+            清空
+          </button>
+        )}
+      </div>
+      {busy && <div className="hint">{phase || "准备中…"}</div>}
+      {groups && (
+        <div className="hint hint-ok">
+          发现 {groups.length} 组重复文件
+          {groups.length > 0 ? `，可释放约 ${fmtBytes(totalWasted)}` : ""}
+        </div>
+      )}
+      {groups && groups.length === 0 && (
+        <div className="port-empty">没有发现重复文件</div>
+      )}
+      {groups &&
+        groups.map((g, gi) => (
+          <div className="dupe-group" key={gi}>
+            <div className="dupe-head">
+              <span className="dupe-title">
+                第 {gi + 1} 组 · {g.files.length} 个相同文件
+              </span>
+              <span className="hint">可释放 {fmtBytes(g.wasted)}</span>
+              <button className="btn-text" onClick={() => keepFirst(gi)}>
+                保留第一个，其余删除
+              </button>
+            </div>
+            <div className="kv-list">
+              {g.files.map((f) => (
+                <div className="kv-row" key={f.path}>
+                  <span className="kv-v kv-mono dupe-path" title={f.path}>
+                    {f.path}
+                  </span>
+                  <span className="kv-k">{fmtBytes(f.size)}</span>
+                  <button className="btn-text" onClick={(e) => reveal(f.path, e)}>
+                    位置
+                  </button>
+                  <button className="btn-text dupe-del" onClick={() => trashFile(f.path, gi)}>
+                    删除
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      <div className="hint">空文件忽略；先按大小分组、再抽样比对、最后完整校验确认；删除均进回收站，最多显示 500 组</div>
+    </div>
+  );
+}
+
+/* ---------- 大小分析 ---------- */
+
+function SizeView() {
+  const [dir, setDir] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [scanText, setScanText] = useState("");
+  const [report, setReport] = useState<DirReport | null>(null);
+
+  useEffect(() => {
+    const un = listen<{ done: number }>("dirsz://progress", (e) =>
+      setScanText(`已扫描 ${e.payload.done} 个文件`),
+    );
+    return () => {
+      un.then((fn) => fn());
+    };
+  }, []);
+
+  async function pick() {
+    const sel = await open({ multiple: false, directory: true });
+    if (typeof sel === "string") setDir(sel);
+  }
+
+  async function scan(target?: string) {
+    const root = (target ?? dir).trim();
+    if (!root) {
+      showToast("请先选择文件夹", "error", 3000);
+      return;
+    }
+    if (target) setDir(target);
+    setBusy(true);
+    setReport(null);
+    try {
+      setReport(await invoke<DirReport>("disk_dir_sizes", { root }));
+    } catch (e) {
+      const m = String(e);
+      if (m !== "已取消") showToast(m, "error", 5000);
+    } finally {
+      setBusy(false);
+      setScanText("");
+    }
+  }
+
+  const maxBytes = report && report.items.length > 0 ? report.items[0].bytes : 1;
+
+  return (
+    <div className="stack">
+      <div className="tool-actions">
+        <input
+          className="input input-mono http-hv"
+          value={dir}
+          onChange={(e) => setDir(e.target.value)}
+          placeholder="选择要分析的文件夹"
+          spellCheck={false}
+        />
+        <button className="btn btn-sm" onClick={pick}>
+          浏览
+        </button>
+        {busy ? (
+          <button className="btn btn-sm" onClick={() => invoke("sb_cancel").catch(() => {})}>
+            取消
+          </button>
+        ) : (
+          <button className="btn btn-primary btn-sm" onClick={() => scan()} disabled={!dir.trim()}>
+            开始扫描
+          </button>
+        )}
+        {!busy && report && (
+          <button className="btn btn-sm" onClick={() => setReport(null)}>
+            清空
+          </button>
+        )}
+      </div>
+      {busy && <div className="hint">{scanText || "准备中…"}</div>}
+      {report && (
+        <>
+          <div className="hint hint-ok">
+            共 {report.total_files} 个文件 · 总计 {fmtBytes(report.total_bytes)}
+          </div>
+          <div className="field">
+            <span className="field-label">一级子项按占用排序（点「进入」下钻子文件夹）</span>
+            <div className="kv-list">
+              {report.items.map((it) => (
+                <div className="kv-row" key={it.path}>
+                  <span className={`size-name${it.is_dir ? " is-dir" : ""}`} title={it.name}>
+                    {it.name}
+                  </span>
+                  <div className="size-bar">
+                    <div
+                      style={{
+                        width: `${Math.max(2, Math.round((it.bytes / Math.max(maxBytes, 1)) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="kv-v">{fmtBytes(it.bytes)}</span>
+                  <span className="kv-k">{it.files} 个文件</span>
+                  {it.is_dir && (
+                    <button className="btn-text" onClick={() => scan(it.path)}>
+                      进入
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          {report.largest.length > 0 && (
+            <div className="field">
+              <span className="field-label">其中最大的文件</span>
+              <div className="kv-list">
+                {report.largest.map((f) => (
+                  <div className="kv-row" key={f.path}>
+                    <span className="kv-v kv-mono dupe-path" title={f.path}>
+                      {f.path}
+                    </span>
+                    <span className="kv-k">{fmtBytes(f.size)}</span>
+                    <button className="btn-text" onClick={(e) => reveal(f.path, e)}>
+                      位置
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}

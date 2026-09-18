@@ -57,6 +57,13 @@ export const tools: ToolModule[] = [
     component: lazy(() => import("./port/PortTool")),
   },
   {
+    id: "http",
+    name: "HTTP 测试",
+    desc: "本地发起请求，查看响应",
+    icon: HttpIcon,
+    component: lazy(() => import("./http/HttpTool")),
+  },
+  {
     id: "regex",
     name: "正则测试",
     desc: "实时匹配高亮与分组解析",
@@ -76,6 +83,20 @@ export const tools: ToolModule[] = [
     desc: "随机强密码批量生成",
     icon: KeyIcon,
     component: lazy(() => import("./pwgen/PwGenTool")),
+  },
+  {
+    id: "color",
+    name: "颜色工具",
+    desc: "HEX 与 RGB、HSL 互转",
+    icon: ColorIcon,
+    component: lazy(() => import("./color/ColorTool")),
+  },
+  {
+    id: "disk",
+    name: "磁盘分析",
+    desc: "重复文件查找与目录大小",
+    icon: DiskIcon,
+    component: lazy(() => import("./disk/DiskTool")),
   },
 ];
 
@@ -203,6 +224,50 @@ function KeyIcon({ size = 16 }: { size?: number }) {
       <rect x="11" y="10.8" width="10" height="2.4" rx="1.2" fill="#9fcdfb" />
       <rect x="16" y="12.4" width="2" height="3.4" rx="1" fill="#06a7ff" />
       <rect x="19.5" y="12.4" width="2" height="3.4" rx="1" fill="#06a7ff" />
+    </svg>
+  );
+}
+
+function HttpIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" fill="#9fcdfb" />
+      <ellipse
+        cx="12"
+        cy="12"
+        rx="4.2"
+        ry="9"
+        stroke="#06a7ff"
+        strokeWidth="1.7"
+        fill="none"
+      />
+      <path d="M3.6 9h16.8M3.6 15h16.8" stroke="#06a7ff" strokeWidth="1.7" />
+      <circle cx="12" cy="12" r="9" stroke="#06a7ff" strokeWidth="2" fill="none" />
+    </svg>
+  );
+}
+
+function ColorIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 3.2C15.5 7.6 18 11 18 14a6 6 0 1 1-12 0c0-3 2.5-6.4 6-10.8z"
+        fill="#9fcdfb"
+      />
+      <path
+        d="M12 8.4c1.8 2.4 3 4.3 3 5.8a3 3 0 0 1-6 0c0-1.5 1.2-3.4 3-5.8z"
+        fill="#06a7ff"
+      />
+    </svg>
+  );
+}
+
+function DiskIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" fill="#9fcdfb" />
+      <path d="M12 3a9 9 0 0 1 9 9h-9z" fill="#06a7ff" />
+      <circle cx="12" cy="12" r="9" stroke="#06a7ff" strokeWidth="2" fill="none" />
     </svg>
   );
 }

@@ -25,7 +25,12 @@ pub fn run() {
             commands::save_data_file,
             commands::read_text_file,
             commands::net_list_ports,
-            commands::net_kill
+            commands::net_kill,
+            commands::net_probe_tcp,
+            commands::http_request,
+            commands::disk_find_dupes,
+            commands::disk_dir_sizes,
+            commands::disk_trash
         ])
         .run(tauri::generate_context!())
         .expect("DevToolbox 启动失败");

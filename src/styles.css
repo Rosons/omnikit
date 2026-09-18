@@ -1325,6 +1325,95 @@ body {
 .pw-strength.s-mid { color: #f59e0b; }
 .pw-strength.s-low { color: var(--danger); }
 
+/* ===== HTTP 测试 ===== */
+.http-row { display: flex; align-items: center; gap: 10px; }
+.http-row .seg { margin-bottom: 0; flex: none; }
+.http-url { flex: 1; min-width: 0; }
+.http-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.http-hv { flex: 1; min-width: 0; }
+.http-status.c-ok { background: var(--success-dim); color: var(--success); }
+.http-status.c-redir { background: #e8f3ff; color: #2f7df6; }
+.http-status.c-err { background: var(--danger-dim); color: var(--danger); }
+
+/* ===== 端口连通测试 ===== */
+.listen-page { flex: 1; min-height: 0; }
+.probe-row { display: flex; align-items: center; gap: 8px; }
+.probe-colon { color: var(--text-3); font-weight: 600; }
+
+/* ===== 颜色工具 ===== */
+.color-row { display: flex; gap: 8px; align-items: center; }
+.color-row .input { flex: 1; min-width: 0; }
+.color-pick {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  cursor: pointer;
+}
+.color-swatch {
+  height: 96px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 8px 12px;
+}
+.color-swatch-text {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+/* ===== 磁盘分析 ===== */
+.dupe-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dupe-head { display: flex; align-items: center; gap: 10px; }
+.dupe-title { font-size: 13px; font-weight: 600; color: var(--text-1); }
+.dupe-head .btn-text { margin-left: auto; }
+.dupe-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dupe-del:hover:not(:disabled) { color: var(--danger); background: var(--danger-dim); }
+.size-name {
+  flex: none;
+  width: 200px;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.size-name.is-dir { color: var(--primary); font-weight: 500; }
+.size-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--fill-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.size-bar > div { height: 100%; background: var(--primary); border-radius: 3px; }
+
 /* 紧凑控件(密码生成/Cron 生成器的数字输入与小按钮) */
 .input-sm { height: 28px; }
 .btn-sm { height: 28px; padding: 0 16px; font-size: 12.5px; }

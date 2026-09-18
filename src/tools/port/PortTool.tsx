@@ -17,6 +17,115 @@ interface PortRow {
 }
 
 export default function PortTool() {
+  const [tab, setTab] = useState<"listen" | "probe">("listen");
+  return (
+    <div className="stack port-page">
+      <div className="seg seg-sm" role="tablist">
+        <button
+          className={`seg-btn${tab === "listen" ? " active" : ""}`}
+          onClick={() => setTab("listen")}
+        >
+          端口监听
+        </button>
+        <button
+          className={`seg-btn${tab === "probe" ? " active" : ""}`}
+          onClick={() => setTab("probe")}
+        >
+          连通测试
+        </button>
+      </div>
+      {tab === "listen" ? <ListenView /> : <ProbeView />}
+    </div>
+  );
+}
+
+interface TcpProbe {
+  ok: boolean;
+  elapsed_ms: number;
+  error: string | null;
+  addr: string;
+}
+
+function ProbeView() {
+  const [host, setHost] = useState("127.0.0.1");
+  const [port, setPort] = useState("80");
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState<TcpProbe | null>(null);
+
+  async function test() {
+    const p = parseInt(port, 10);
+    if (!host.trim() || !Number.isInteger(p) || p < 1 || p > 65535) {
+      showToast("请输入有效的主机与端口（1-65535）", "error", 3000);
+      return;
+    }
+    setBusy(true);
+    setRes(null);
+    try {
+      setRes(await invoke<TcpProbe>("net_probe_tcp", { host: host.trim(), port: p }));
+    } catch (e) {
+      showToast(String(e), "error", 5000);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="stack">
+      <div className="field">
+        <span className="field-label">目标地址与端口（TCP 连接测试，超时 3 秒）</span>
+        <div className="probe-row">
+          <input
+            className="input input-mono"
+            style={{ flex: 1 }}
+            value={host}
+            onChange={(e) => setHost(e.target.value)}
+            placeholder="主机名或 IP"
+            spellCheck={false}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") test();
+            }}
+          />
+          <span className="probe-colon">:</span>
+          <input
+            className="input input-mono"
+            style={{ width: 100 }}
+            value={port}
+            onChange={(e) => setPort(e.target.value)}
+            placeholder="端口"
+            spellCheck={false}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") test();
+            }}
+          />
+          <button className="btn btn-primary btn-sm" onClick={test} disabled={busy}>
+            {busy ? "测试中…" : "测试"}
+          </button>
+        </div>
+      </div>
+      {res && (
+        <div className="kv-list">
+          <div className="kv-row">
+            <span className="kv-k">结果</span>
+            {res.ok ? (
+              <span className="jwt-chip valid">可连接 · 耗时 {res.elapsed_ms} ms</span>
+            ) : (
+              <span className="jwt-chip expired">
+                连接失败{res.error ? `：${res.error}` : ""}
+              </span>
+            )}
+          </div>
+          <div className="kv-row">
+            <span className="kv-k">实际地址</span>
+            <span className="kv-v kv-mono">{res.addr || "-"}</span>
+          </div>
+        </div>
+      )}
+      <div className="hint">用于快速验证某个服务的端口是否可达，例如数据库、消息队列、代理</div>
+    </div>
+  );
+}
+
+function ListenView() {
   const [rows, setRows] = useState<PortRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
@@ -85,7 +194,7 @@ export default function PortTool() {
   }
 
   return (
-    <div className="stack port-page">
+    <div className="stack listen-page">
       <div className="tool-actions">
         <input
           className="input"

@@ -161,6 +161,16 @@ devtoolbox/
 - 端口页曾因「数据未加载时 filtered 为 null 直接 .map」白屏一次(diff 页同类问题第二次出现)——**教训:渲染列表永远不要用 `!` 非空断言,一律 `xxx &&` 守卫**
 - **端口行可展开进程详情**(用户要求):`process_details()` 改用 **sysinfo 0.33** 一次读取全部进程(name/exe/cmd/memory/start_time,替代 tasklist 文本解析),PortEntry 扩展 name/path/cmd/mem/start 字段;前端点击行展开 `.port-detail`(进程/路径/命令行/启动时间/内存/打开所在文件夹——复用 sb_reveal),行点击与内部按钮 stopPropagation;系统进程路径可能取不到(权限),显示「不可获取」
 
+### v0.3.0 第三批工具(2026-09-19,用户挑了 HTTP/颜色/TCP 连通/重复查找/大小分析)
+侧边栏现为 **12 个工具**。新增:
+- **端口占用拆两个子页**:端口监听(原功能,ListenView)/**连通测试**(ProbeView:`net_probe_tcp` Rust TCP connect_timeout,多解析地址逐个尝试,3 秒超时;结果 chip 可连接·耗时/失败原因+实际地址;回车触发)
+- **HTTP 测试**(id `http`,`src/tools/http/HttpTool.tsx` + Rust `http_request` 用 **ureq 2**,30s 超时,4xx/5xx 按正常响应返回不算错误;响应体上限 2MB,GBK 页面按 charset 用 encoding_rs 解码;请求头名合法性校验防 panic):方法 seg(GET/POST/PUT/PATCH/DELETE)+URL 回车发送+动态请求头行+请求体;结果:状态 chip(2xx 绿/3xx 蓝/4xx5xx 红)+耗时+大小+响应头列表+响应体(JSON 自动格式化)
+- **颜色工具**(id `color`,`src/tools/color/ColorTool.tsx`,纯前端):HEX(#rgb/#rrggbb/#rrggbbaa)/rgb()/hsl() 自动识别互转,系统取色器 input[type=color] 联动,大色块预览+三种格式复制行
+- **磁盘分析**(id `disk`,`src/tools/disk/DiskTool.tsx`,重复文件/大小分析子页):
+  - 重复查找:`disk_find_dupes` 四步流水(递归收集非空文件→按大小分组→首 4KB MD5 抽样预筛→全量 MD5 确认),进度事件 `dup://progress`(scan/part/hash 三阶段),复用 cancel_slot 取消;结果按可释放空间降序最多 500 组;每组内文件可「位置」(sb_reveal)/「删除」(`disk_trash` 用 **trash 3** 进回收站),组级「保留第一个其余删除」
+  - 大小分析:`disk_dir_sizes` 递归累计一级子项(字节+文件数),进度事件 `dirsz://progress`,Top20 大文件原地维护;前端占比条形图+「进入」下钻(重新扫子目录)
+- 新增依赖:ureq 2、trash 3;新命令 6 个;新图标 HttpIcon 地球/ColorIcon 水滴/DiskIcon 饼图
+
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)
 

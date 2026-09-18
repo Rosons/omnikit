@@ -34,6 +34,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
+use walkdir::WalkDir;
 use zeroize::Zeroizing;
 
 const EVENT_PROGRESS: &str = "safebox://progress";
@@ -739,6 +740,485 @@ pub fn net_kill(pid: u32) -> Result<(), String> {
     let msg = if so.is_empty() { se } else { so };
     let msg = if msg.is_empty() { "未知错误" } else { msg };
     Err(format!("结束进程（PID {pid}）失败：{msg}"))
+}
+
+/* ---------- TCP 连通测试 ---------- */
+
+#[derive(Serialize)]
+pub struct TcpProbe {
+    pub ok: bool,
+    pub elapsed_ms: u64,
+    pub error: Option<String>,
+    pub addr: String,
+}
+
+#[tauri::command]
+pub async fn net_probe_tcp(
+    host: String,
+    port: u16,
+    timeout_ms: Option<u64>,
+) -> Result<TcpProbe, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use std::net::{TcpStream, ToSocketAddrs};
+        let timeout = Duration::from_millis(timeout_ms.unwrap_or(3000).clamp(500, 15000));
+        let addr_text = format!("{}:{}", host, port);
+        let addrs: Vec<std::net::SocketAddr> = match (host.as_str(), port).to_socket_addrs() {
+            Ok(a) => a.collect(),
+            Err(e) => {
+                return Ok(TcpProbe {
+                    ok: false,
+                    elapsed_ms: 0,
+                    error: Some(format!("地址解析失败：{e}")),
+                    addr: addr_text,
+                })
+            }
+        };
+        let start = Instant::now();
+        let mut last_err: Option<std::io::Error> = None;
+        for a in &addrs {
+            match TcpStream::connect_timeout(a, timeout) {
+                Ok(_) => {
+                    return Ok(TcpProbe {
+                        ok: true,
+                        elapsed_ms: start.elapsed().as_millis() as u64,
+                        error: None,
+                        addr: a.to_string(),
+                    })
+                }
+                Err(e) => last_err = Some(e),
+            }
+        }
+        Ok(TcpProbe {
+            ok: false,
+            elapsed_ms: start.elapsed().as_millis() as u64,
+            error: Some(
+                last_err
+                    .map(|e| e.to_string())
+                    .unwrap_or_else(|| "没有可用的地址".into()),
+            ),
+            addr: addrs
+                .first()
+                .map(|a| a.to_string())
+                .unwrap_or(addr_text),
+        })
+    })
+    .await
+    .map_err(|e| format!("任务执行失败：{e}"))?
+}
+
+/* ---------- HTTP 请求测试 ---------- */
+
+#[derive(Serialize)]
+pub struct HttpResult {
+    pub status: u16,
+    pub headers: Vec<(String, String)>,
+    pub body: String,
+    pub time_ms: u64,
+    pub size: usize,
+}
+
+fn http_build_result(r: ureq::Response, time_ms: u64) -> HttpResult {
+    let mut headers: Vec<(String, String)> = Vec::new();
+    for name in r.headers_names() {
+        if let Some(v) = r.header(&name) {
+            headers.push((name, v.to_string()));
+        }
+    }
+    headers.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+    let status = r.status();
+    let charset_gbk = r
+        .header("content-type")
+        .map(|c| c.to_lowercase().contains("gb2312") || c.to_lowercase().contains("gbk"))
+        .unwrap_or(false);
+    let mut buf = Vec::new();
+    let _ = std::io::Read::read_to_end(
+        &mut r.into_reader().take(2 * 1024 * 1024),
+        &mut buf,
+    );
+    let size = buf.len();
+    let body = if charset_gbk {
+        let (s, _, _) = encoding_rs::GBK.decode(&buf);
+        s.into_owned()
+    } else {
+        String::from_utf8_lossy(&buf).into_owned()
+    };
+    HttpResult {
+        status,
+        headers,
+        body,
+        time_ms,
+        size,
+    }
+}
+
+#[tauri::command]
+pub async fn http_request(
+    method: String,
+    url: String,
+    headers: Vec<(String, String)>,
+    body: Option<String>,
+) -> Result<HttpResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if url.trim().is_empty() {
+            return Err("请输入请求地址".into());
+        }
+        let upper = method.to_uppercase();
+        if !matches!(upper.as_str(), "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD") {
+            return Err(format!("不支持的方法：{method}"));
+        }
+        let mut req = ureq::request(&upper, url.trim())
+            .timeout(Duration::from_secs(30))
+            .set("User-Agent", "DevToolbox/0.2");
+        for (k, v) in &headers {
+            let k = k.trim();
+            let v = v.trim();
+            if k.is_empty() {
+                continue;
+            }
+            let name_ok = !k.is_empty()
+                && k.bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b));
+            if !name_ok {
+                return Err(format!("请求头名称不合法：{k}"));
+            }
+            if v.contains('\n') || v.contains('\r') {
+                return Err(format!("请求头值不合法：{k}"));
+            }
+            req = req.set(k, v);
+        }
+        let start = Instant::now();
+        let has_body = !body.as_deref().unwrap_or("").is_empty()
+            && !matches!(upper.as_str(), "GET" | "HEAD");
+        let result = if has_body {
+            req.send_string(body.as_deref().unwrap_or(""))
+        } else {
+            req.call()
+        };
+        let time_ms = start.elapsed().as_millis() as u64;
+        match result {
+            Ok(r) => Ok(http_build_result(r, time_ms)),
+            // 4xx/5xx 对测试工具来说是正常响应,返回内容而非错误
+            Err(ureq::Error::Status(_, r)) => Ok(http_build_result(r, time_ms)),
+            Err(e) => Err(format!("请求失败：{e}")),
+        }
+    })
+    .await
+    .map_err(|e| format!("任务执行失败：{e}"))?
+}
+
+/* ---------- 磁盘分析:重复文件与目录大小 ---------- */
+
+#[derive(Serialize, Clone)]
+pub struct DiskFile {
+    pub path: String,
+    pub size: u64,
+}
+
+#[derive(Serialize)]
+pub struct DupeGroup {
+    pub files: Vec<DiskFile>,
+    pub wasted: u64,
+}
+
+#[derive(Serialize)]
+pub struct DirItem {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub bytes: u64,
+    pub files: u64,
+}
+
+#[derive(Serialize)]
+pub struct DirReport {
+    pub total_bytes: u64,
+    pub total_files: u64,
+    pub items: Vec<DirItem>,
+    pub largest: Vec<DiskFile>,
+}
+
+fn partial_hash(path: &Path) -> [u8; 16] {
+    let mut hasher = Md5::new();
+    if let Ok(mut f) = fs::File::open(path) {
+        let mut buf = [0u8; 4096];
+        if let Ok(n) = std::io::Read::read(&mut f, &mut buf) {
+            hasher.update(&buf[..n]);
+        }
+    }
+    hasher.finalize().into()
+}
+
+fn full_hash(path: &Path) -> Result<[u8; 16], String> {
+    let mut file = fs::File::open(path).map_err(|e| format!("读取失败：{e}"))?;
+    let mut hasher = Md5::new();
+    std::io::copy(&mut file, &mut hasher).map_err(|e| format!("读取失败：{e}"))?;
+    Ok(hasher.finalize().into())
+}
+
+fn find_dupes_impl(
+    root: String,
+    app: &AppHandle,
+    stop: &dyn Fn() -> bool,
+) -> Result<Vec<DupeGroup>, String> {
+    let emit_progress = |phase: &str, done: u64, total: u64| {
+        let _ = app.emit(
+            "dup://progress",
+            serde_json::json!({ "phase": phase, "done": done, "total": total }),
+        );
+    };
+    if !Path::new(&root).is_dir() {
+        return Err("请选择有效的文件夹".into());
+    }
+
+    // 1 递归收集非空文件
+    let mut files: Vec<(PathBuf, u64)> = Vec::new();
+    let mut checked = 0u64;
+    for entry in WalkDir::new(&root).follow_links(false) {
+        checked += 1;
+        if checked % 500 == 0 {
+            emit_progress("scan", files.len() as u64, 0);
+        }
+        if stop() {
+            return Err(Error::Cancelled.to_string());
+        }
+        if let Ok(e) = entry {
+            if e.file_type().is_file() {
+                if let Ok(md) = e.metadata() {
+                    if md.len() > 0 {
+                        files.push((e.into_path(), md.len()));
+                    }
+                }
+            }
+        }
+    }
+
+    // 2 按大小分组,只留多副本候选
+    let mut by_size: std::collections::HashMap<u64, Vec<PathBuf>> =
+        std::collections::HashMap::new();
+    for (path, size) in files {
+        by_size.entry(size).or_default().push(path);
+    }
+    let size_groups: Vec<(u64, Vec<PathBuf>)> = by_size
+        .into_iter()
+        .filter(|(_, v)| v.len() > 1)
+        .collect();
+
+    // 3 首块抽样哈希预筛
+    let total_part: u64 = size_groups.iter().map(|(_, v)| v.len() as u64).sum();
+    let mut done = 0u64;
+    let mut candidates: Vec<(u64, Vec<PathBuf>)> = Vec::new();
+    for (size, paths) in size_groups {
+        let mut m: std::collections::HashMap<[u8; 16], Vec<PathBuf>> =
+            std::collections::HashMap::new();
+        for path in paths {
+            done += 1;
+            if done % 200 == 0 {
+                emit_progress("part", done, total_part);
+            }
+            if stop() {
+                return Err(Error::Cancelled.to_string());
+            }
+            let h = partial_hash(&path);
+            m.entry(h).or_default().push(path);
+        }
+        for (_, ps) in m {
+            if ps.len() > 1 {
+                candidates.push((size, ps));
+            }
+        }
+    }
+
+    // 4 全量哈希确认
+    let total_full: u64 = candidates.iter().map(|(_, v)| v.len() as u64).sum();
+    let mut done = 0u64;
+    let mut groups: Vec<DupeGroup> = Vec::new();
+    for (size, paths) in candidates {
+        let mut m: std::collections::HashMap<[u8; 16], Vec<DiskFile>> =
+            std::collections::HashMap::new();
+        for path in paths {
+            done += 1;
+            if done % 50 == 0 || done == total_full {
+                emit_progress("hash", done, total_full);
+            }
+            if stop() {
+                return Err(Error::Cancelled.to_string());
+            }
+            let h = full_hash(&path)?;
+            m.entry(h).or_default().push(DiskFile {
+                path: path.to_string_lossy().into_owned(),
+                size,
+            });
+        }
+        for (_, fs) in m {
+            if fs.len() > 1 {
+                let wasted = size * (fs.len() as u64 - 1);
+                groups.push(DupeGroup { files: fs, wasted });
+            }
+        }
+    }
+    groups.sort_by(|a, b| b.wasted.cmp(&a.wasted));
+    groups.truncate(500);
+    Ok(groups)
+}
+
+#[tauri::command]
+pub async fn disk_find_dupes(
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+    root: String,
+) -> Result<Vec<DupeGroup>, String> {
+    let cancelled = Arc::new(AtomicBool::new(false));
+    *state.cancel_slot.lock().unwrap() = Some(cancelled.clone());
+    let task_flag = cancelled.clone();
+    let app2 = app.clone();
+    let joined = tauri::async_runtime::spawn_blocking(move || {
+        find_dupes_impl(root, &app2, &|| task_flag.load(Ordering::Relaxed))
+    })
+    .await;
+    {
+        let mut slot = state.cancel_slot.lock().unwrap();
+        if slot
+            .as_ref()
+            .map(|f| Arc::ptr_eq(f, &cancelled))
+            .unwrap_or(false)
+        {
+            *slot = None;
+        }
+    }
+    joined.map_err(|e| format!("任务执行失败：{e}"))?
+}
+
+fn walk_size_dir(
+    dir: &Path,
+    app: &AppHandle,
+    counter: &Cell<u64>,
+    stop: &dyn Fn() -> bool,
+) -> Result<(u64, u64), String> {
+    let mut bytes = 0u64;
+    let mut files = 0u64;
+    let rd = fs::read_dir(dir).map_err(|e| format!("读取失败：{e}"))?;
+    for entry in rd {
+        if stop() {
+            return Err(Error::Cancelled.to_string());
+        }
+        let entry = entry.map_err(|e| format!("读取失败：{e}"))?;
+        let p = entry.path();
+        if p.is_dir() {
+            let (b, f) = walk_size_dir(&p, app, counter, stop)?;
+            bytes += b;
+            files += f;
+        } else if let Ok(md) = entry.metadata() {
+            bytes += md.len();
+            files += 1;
+            let c = counter.get() + 1;
+            counter.set(c);
+            if c % 2000 == 0 {
+                let _ = app.emit("dirsz://progress", serde_json::json!({ "done": c }));
+            }
+        }
+    }
+    Ok((bytes, files))
+}
+
+fn keep_top_n(list: &mut Vec<DiskFile>, item: DiskFile, n: usize) {
+    if list.len() < n {
+        list.push(item);
+        list.sort_by(|a, b| b.size.cmp(&a.size));
+    } else if let Some(last) = list.last() {
+        if item.size > last.size {
+            list.pop();
+            list.push(item);
+            list.sort_by(|a, b| b.size.cmp(&a.size));
+        }
+    }
+}
+
+fn dir_sizes_impl(
+    root: String,
+    app: &AppHandle,
+    stop: &dyn Fn() -> bool,
+) -> Result<DirReport, String> {
+    let top = PathBuf::from(&root);
+    if !top.is_dir() {
+        return Err("请选择有效的文件夹".into());
+    }
+    let counter = Cell::new(0u64);
+    let mut largest: Vec<DiskFile> = Vec::new();
+    let mut items: Vec<DirItem> = Vec::new();
+    let rd = fs::read_dir(&top).map_err(|e| format!("读取失败：{e}"))?;
+    for entry in rd {
+        if stop() {
+            return Err(Error::Cancelled.to_string());
+        }
+        let entry = entry.map_err(|e| format!("读取失败：{e}"))?;
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let is_dir = path.is_dir();
+        let (bytes, files) = if is_dir {
+            walk_size_dir(&path, app, &counter, stop)?
+        } else {
+            let b = entry.metadata().map(|m| m.len()).unwrap_or(0);
+            let c = counter.get() + 1;
+            counter.set(c);
+            (b, 1)
+        };
+        if !is_dir {
+            keep_top_n(
+                &mut largest,
+                DiskFile {
+                    path: path.to_string_lossy().into_owned(),
+                    size: bytes,
+                },
+                20,
+            );
+        }
+        items.push(DirItem {
+            name,
+            path: path.to_string_lossy().into_owned(),
+            is_dir,
+            bytes,
+            files,
+        });
+    }
+    items.sort_by(|a, b| b.bytes.cmp(&a.bytes));
+    Ok(DirReport {
+        total_bytes: items.iter().map(|i| i.bytes).sum(),
+        total_files: items.iter().map(|i| i.files).sum(),
+        items,
+        largest,
+    })
+}
+
+#[tauri::command]
+pub async fn disk_dir_sizes(
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+    root: String,
+) -> Result<DirReport, String> {
+    let cancelled = Arc::new(AtomicBool::new(false));
+    *state.cancel_slot.lock().unwrap() = Some(cancelled.clone());
+    let task_flag = cancelled.clone();
+    let app2 = app.clone();
+    let joined = tauri::async_runtime::spawn_blocking(move || {
+        dir_sizes_impl(root, &app2, &|| task_flag.load(Ordering::Relaxed))
+    })
+    .await;
+    {
+        let mut slot = state.cancel_slot.lock().unwrap();
+        if slot
+            .as_ref()
+            .map(|f| Arc::ptr_eq(f, &cancelled))
+            .unwrap_or(false)
+        {
+            *slot = None;
+        }
+    }
+    joined.map_err(|e| format!("任务执行失败：{e}"))?
+}
+
+#[tauri::command]
+pub fn disk_trash(path: String) -> Result<(), String> {
+    trash::delete(&path).map_err(|e| format!("移入回收站失败：{e}"))
 }
 
 #[cfg(test)]

@@ -1300,6 +1300,28 @@ body {
 .pw-strength.s-high { color: var(--success); }
 .pw-strength.s-mid { color: #f59e0b; }
 .pw-strength.s-low { color: var(--danger); }
+
+/* 紧凑控件(密码生成/Cron 生成器的数字输入与小按钮) */
+.input-sm { height: 28px; }
+.btn-sm { height: 28px; padding: 0 16px; font-size: 12.5px; }
+
+/* 正则 flags 徽标:字母独立成块,避免与中文基线不齐 */
+.opt-chip { gap: 5px; }
+.flag-k {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: rgba(6, 167, 255, 0.12);
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+.opt-chip.on .flag-k { background: rgba(6, 167, 255, 0.24); }
 .diff-stats {
   display: inline-flex;
   gap: 10px;

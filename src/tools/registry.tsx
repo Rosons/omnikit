@@ -65,7 +65,7 @@ export const tools: ToolModule[] = [
   },
   {
     id: "expr",
-    name: "JWT·Cron",
+    name: "JWT 与 Cron",
     desc: "令牌解码与定时表达式",
     icon: ClockIcon,
     component: lazy(() => import("./expr/ExprTool")),

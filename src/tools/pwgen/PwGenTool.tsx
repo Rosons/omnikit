@@ -108,7 +108,7 @@ export default function PwGenTool() {
         <label className="kv-k">
           长度
           <input
-            className="input"
+            className="input input-sm"
             style={{ width: 70 }}
             type="number"
             min={6}
@@ -120,7 +120,7 @@ export default function PwGenTool() {
         <label className="kv-k">
           数量
           <input
-            className="input"
+            className="input input-sm"
             style={{ width: 70 }}
             type="number"
             min={1}
@@ -129,7 +129,7 @@ export default function PwGenTool() {
             onChange={(e) => setCount(Number(e.target.value))}
           />
         </label>
-        <button className="btn btn-primary" onClick={generate} disabled={!pool}>
+        <button className="btn btn-primary btn-sm" onClick={generate} disabled={!pool}>
           生成密码
         </button>
         {list.length > 0 && <CopyButton text={list.join("\n")} label="复制全部" />}

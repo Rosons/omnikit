@@ -264,12 +264,13 @@ function fmtDate(d: Date): string {
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 function CronView() {
+  const [cronTab, setCronTab] = useState<"parse" | "gen">("parse");
   const [expr, setExpr] = useState("0 9 * * 1-5");
   const parsed = useMemo(() => parseCron(expr), [expr]);
   const runs = useMemo(() => (typeof parsed === "string" ? [] : nextRuns(parsed)), [parsed]);
 
   // 生成器
-  const [mode, setMode] = useState<"minute" | "hourly" | "daily" | "weekly" | "monthly" | "custom">("daily");
+  const [mode, setMode] = useState<"minute" | "hourly" | "daily" | "weekly" | "monthly">("daily");
   const [bN, setBN] = useState(5);
   const [bMin, setBMin] = useState(0);
   const [bHour, setBHour] = useState(9);
@@ -277,9 +278,8 @@ function CronView() {
   const [bWd, setBWd] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
 
   useEffect(() => {
-    if (mode === "custom") return;
     const wd = [...bWd].sort((a, b) => a - b).join(",") || "*";
-    const map: Record<Exclude<typeof mode, "custom">, string> = {
+    const map: Record<typeof mode, string> = {
       minute: `*/${clamp(bN, 1, 59)} * * * *`,
       hourly: `${clamp(bMin, 0, 59)} * * * *`,
       daily: `${clamp(bMin, 0, 59)} ${clamp(bHour, 0, 23)} * * *`,
@@ -295,7 +295,6 @@ function CronView() {
     { k: "daily", label: "每天" },
     { k: "weekly", label: "每周" },
     { k: "monthly", label: "每月" },
-    { k: "custom", label: "自定义" },
   ];
 
   function toggleWd(v: number) {
@@ -327,105 +326,174 @@ function CronView() {
 
   return (
     <div className="stack">
-      <div className="field">
-        <span className="field-label">表达式（分 时 日 月 周，标准 crontab 格式）</span>
-        <input
-          className={`input input-mono${typeof parsed === "string" ? " input-error" : ""}`}
-          value={expr}
-          onChange={(e) => {
-            setExpr(e.target.value);
-            setMode("custom");
-          }}
-          placeholder="如 */5 * * * *"
-          spellCheck={false}
-        />
-        {typeof parsed === "string" && <span className="hint hint-error">{parsed}</span>}
+      <div className="seg seg-sm" role="tablist">
+        <button
+          className={`seg-btn${cronTab === "parse" ? " active" : ""}`}
+          onClick={() => setCronTab("parse")}
+        >
+          解析
+        </button>
+        <button
+          className={`seg-btn${cronTab === "gen" ? " active" : ""}`}
+          onClick={() => setCronTab("gen")}
+        >
+          生成
+        </button>
       </div>
 
-      {typeof parsed !== "string" && (
+      {cronTab === "parse" && (
         <>
           <div className="field">
-            <span className="field-label">字段含义</span>
-            <div className="cron-table">
-              <div className="cron-h">字段</div>
-              <div className="cron-h">取值</div>
-              <div className="cron-h">含义</div>
-              {["分钟", "小时", "日", "月", "星期"].map((name, i) => (
-                <FragmentLine key={name} name={name} raw={parsed.raw[i]} desc={descs[i]} />
+            <span className="field-label">表达式（分 时 日 月 周，标准 crontab 格式）</span>
+            <input
+              className={`input input-mono${typeof parsed === "string" ? " input-error" : ""}`}
+              value={expr}
+              onChange={(e) => setExpr(e.target.value)}
+              placeholder="如 */5 * * * *"
+              spellCheck={false}
+            />
+            {typeof parsed === "string" && <span className="hint hint-error">{parsed}</span>}
+          </div>
+
+          {typeof parsed !== "string" && (
+            <>
+              <div className="field">
+                <span className="field-label">字段含义</span>
+                <div className="cron-table">
+                  <div className="cron-h">字段</div>
+                  <div className="cron-h">取值</div>
+                  <div className="cron-h">含义</div>
+                  {["分钟", "小时", "日", "月", "星期"].map((name, i) => (
+                    <FragmentLine key={name} name={name} raw={parsed.raw[i]} desc={descs[i]} />
+                  ))}
+                </div>
+              </div>
+              <RunList runs={runs} />
+            </>
+          )}
+        </>
+      )}
+
+      {cronTab === "gen" && (
+        <>
+          <div className="field">
+            <span className="field-label">选择模式</span>
+            <div className="diff-opts">
+              {PRESETS.map((p) => (
+                <button
+                  key={p.k}
+                  className={`opt-chip${mode === p.k ? " on" : ""}`}
+                  onClick={() => setMode(p.k)}
+                >
+                  {p.label}
+                </button>
               ))}
             </div>
-          </div>
-          <div className="field">
-            <span className="field-label">
-              未来 {runs.length} 次执行
-              {runs.length > 0 && <CopyButton text={runs.map(fmtDate).join("\n")} label="复制全部" />}
-            </span>
-            <div className="kv-list">
-              {runs.map((d, i) => (
-                <div className="kv-row" key={i}>
-                  <span className="kv-k">第 {i + 1} 次</span>
-                  <span className="kv-v">{fmtDate(d)}</span>
-                </div>
-              ))}
-              {runs.length === 0 && (
-                <div className="kv-row">
-                  <span className="hint">一年内没有匹配的时间，请检查表达式</span>
+            <div className="tool-actions">
+              {mode === "minute" && (
+                <label className="kv-k">
+                  间隔分钟
+                  <input
+                    className="input input-sm"
+                    style={{ width: 70 }}
+                    type="number"
+                    min={1}
+                    max={59}
+                    value={bN}
+                    onChange={(e) => setBN(Number(e.target.value))}
+                  />
+                </label>
+              )}
+              {mode !== "minute" && (
+                <label className="kv-k">
+                  时
+                  <input
+                    className="input input-sm"
+                    style={{ width: 70 }}
+                    type="number"
+                    min={0}
+                    max={23}
+                    value={bHour}
+                    onChange={(e) => setBHour(Number(e.target.value))}
+                  />
+                </label>
+              )}
+              {mode !== "minute" && (
+                <label className="kv-k">
+                  分
+                  <input
+                    className="input input-sm"
+                    style={{ width: 70 }}
+                    type="number"
+                    min={0}
+                    max={59}
+                    value={bMin}
+                    onChange={(e) => setBMin(Number(e.target.value))}
+                  />
+                </label>
+              )}
+              {mode === "monthly" && (
+                <label className="kv-k">
+                  日
+                  <input
+                    className="input input-sm"
+                    style={{ width: 70 }}
+                    type="number"
+                    min={1}
+                    max={28}
+                    value={bDom}
+                    onChange={(e) => setBDom(Number(e.target.value))}
+                  />
+                </label>
+              )}
+              {mode === "weekly" && (
+                <div className="diff-opts">
+                  {[1, 2, 3, 4, 5, 6, 0].map((v) => (
+                    <button
+                      key={v}
+                      className={`opt-chip${bWd.has(v) ? " on" : ""}`}
+                      onClick={() => toggleWd(v)}
+                    >
+                      {WD[v]}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
           </div>
+          <div className="field">
+            <span className="field-label">
+              生成的表达式
+              <CopyButton text={expr} />
+            </span>
+            <input className="input input-mono" value={expr} readOnly spellCheck={false} />
+          </div>
+          <RunList runs={runs} />
         </>
       )}
+    </div>
+  );
+}
 
-      <div className="field">
-        <span className="field-label">生成器（选择模式后改动会直接写入上方表达式）</span>
-        <div className="diff-opts">
-          {PRESETS.map((p) => (
-            <button
-              key={p.k}
-              className={`opt-chip${mode === p.k ? " on" : ""}`}
-              onClick={() => setMode(p.k)}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        <div className="tool-actions">
-          {mode === "minute" && (
-            <label className="kv-k">
-              间隔分钟
-              <input className="input" style={{ width: 70 }} type="number" min={1} max={59} value={bN} onChange={(e) => setBN(Number(e.target.value))} />
-            </label>
-          )}
-          {(mode === "hourly" || mode === "daily" || mode === "weekly" || mode === "monthly") && (
-            <label className="kv-k">
-              时
-              <input className="input" style={{ width: 70 }} type="number" min={0} max={23} value={bHour} onChange={(e) => setBHour(Number(e.target.value))} />
-            </label>
-          )}
-          {(mode === "hourly" || mode === "daily" || mode === "weekly" || mode === "monthly") && (
-            <label className="kv-k">
-              分
-              <input className="input" style={{ width: 70 }} type="number" min={0} max={59} value={bMin} onChange={(e) => setBMin(Number(e.target.value))} />
-            </label>
-          )}
-          {mode === "monthly" && (
-            <label className="kv-k">
-              日
-              <input className="input" style={{ width: 70 }} type="number" min={1} max={28} value={bDom} onChange={(e) => setBDom(Number(e.target.value))} />
-            </label>
-          )}
-          {mode === "weekly" && (
-            <div className="diff-opts">
-              {[1, 2, 3, 4, 5, 6, 0].map((v) => (
-                <button key={v} className={`opt-chip${bWd.has(v) ? " on" : ""}`} onClick={() => toggleWd(v)}>
-                  {WD[v]}
-                </button>
-              ))}
-            </div>
-          )}
-          {mode === "custom" && <span className="hint">直接在上方输入框编辑表达式</span>}
-        </div>
+function RunList({ runs }: { runs: Date[] }) {
+  return (
+    <div className="field">
+      <span className="field-label">
+        未来 {runs.length} 次执行
+        {runs.length > 0 && <CopyButton text={runs.map(fmtDate).join("\n")} label="复制全部" />}
+      </span>
+      <div className="kv-list">
+        {runs.map((d, i) => (
+          <div className="kv-row" key={i}>
+            <span className="kv-k">第 {i + 1} 次</span>
+            <span className="kv-v">{fmtDate(d)}</span>
+          </div>
+        ))}
+        {runs.length === 0 && (
+          <div className="kv-row">
+            <span className="hint">一年内没有匹配的时间，请检查表达式</span>
+          </div>
+        )}
       </div>
     </div>
   );

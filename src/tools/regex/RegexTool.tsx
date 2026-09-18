@@ -91,7 +91,8 @@ export default function RegexTool() {
               className={`opt-chip${flags.has(f.k) ? " on" : ""}`}
               onClick={() => toggleFlag(f.k)}
             >
-              {f.k} · {f.label}
+              <span className="flag-k">{f.k}</span>
+              {f.label}
             </button>
           ))}
         </div>

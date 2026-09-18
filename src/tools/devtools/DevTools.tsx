@@ -80,7 +80,7 @@ function JsonTool() {
           className="textarea"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder='粘贴 JSON,如 {"a":1}'
+          placeholder='粘贴 JSON，如 {"a":1}'
           spellCheck={false}
         />
       </div>
@@ -152,7 +152,7 @@ function TimeTool() {
       </div>
 
       <div className="field">
-        <span className="field-label">时间戳 → 日期(10 位秒 / 13 位毫秒,自动识别)</span>
+        <span className="field-label">时间戳 → 日期（10 位秒 / 13 位毫秒，自动识别）</span>
         <input
           className="input input-mono"
           value={stamp}
@@ -174,7 +174,7 @@ function TimeTool() {
             </div>
           </>
         ) : (
-          <span className="hint hint-error">无法识别的时间戳,请输入纯数字</span>
+          <span className="hint hint-error">无法识别的时间戳，请输入纯数字</span>
         ))}
 
       <div className="field">
@@ -188,7 +188,7 @@ function TimeTool() {
       </div>
       {validReversed && (
         <div className="kv-row">
-          <span>时间戳(毫秒 / 秒)</span>
+          <span>时间戳（毫秒 / 秒）</span>
           <span className="kv-value">
             {validReversed.getTime()} / {Math.floor(validReversed.getTime() / 1000)}
           </span>
@@ -228,7 +228,7 @@ function CodecTool() {
       setOutput("");
       showToast(
         op === "b64d" || op === "urld"
-          ? `解码失败:${String(e)}(请确认输入内容合法)`
+          ? `解码失败：${String(e)}（请确认输入内容合法）`
           : String(e),
         "error",
         5000
@@ -314,7 +314,7 @@ function UuidTool() {
       </div>
       {list.length === 0 ? (
         <div className="placeholder-box">
-          选择数量后点击「生成 UUID v4」,结果会显示在这里
+          选择数量后点击「生成 UUID v4」，结果会显示在这里
         </div>
       ) : (
         <div className="field">
@@ -359,7 +359,7 @@ function HashTool() {
   return (
     <div className="stack">
       <div className="field">
-        <span className="field-label">输入文本(按 UTF-8 计算)</span>
+        <span className="field-label">输入文本（按 UTF-8 计算）</span>
         <textarea
           className="textarea"
           value={input}

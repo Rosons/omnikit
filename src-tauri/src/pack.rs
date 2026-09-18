@@ -382,7 +382,7 @@ mod tests {
         for rel in &a {
             let left = fs::read(rel).unwrap();
             let right = fs::read(dst.join(rel.strip_prefix(src).unwrap())).unwrap();
-            assert_eq!(left, right, "内容不一致:{}", rel.display());
+            assert_eq!(left, right, "内容不一致：{}", rel.display());
         }
     }
 

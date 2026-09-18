@@ -20,7 +20,10 @@ pub fn run() {
             commands::sb_history_remove,
             commands::sb_history_clear,
             commands::sb_cancel,
-            commands::sb_hash_file
+            commands::sb_hash_file,
+            commands::qr_read_image,
+            commands::save_data_file,
+            commands::read_text_file
         ])
         .run(tauri::generate_context!())
         .expect("DevToolbox 启动失败");

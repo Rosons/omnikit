@@ -1,7 +1,7 @@
 # DevToolbox 项目交接文档
 
 > 用途:在新会话中继续开发。本文档自包含全部上下文,无需原会话历史。
-> 更新时间:2026-09-18(**v0.1.0 已完成并出包**,见第四节末尾「当前状态」)
+> 更新时间:2026-09-18(**v0.1.2 已新增二维码/文本对比工具并出包**,见第四节「v0.1.2」)
 
 ## 一、项目是什么
 
@@ -109,6 +109,18 @@ devtoolbox/
 - **页面联动**:`src/lib/bus.ts`(requestDecrypt/peekDecryptPrefill 版本戳防重放),文件管理加密记录点「解密」→ 切到保险箱预填 .box 路径
 - **第三个工具「开发小工具」**(registry id `devtools`):JSON 格式化/压缩、时间戳双向转换(10/13 位自动识别)、Base64/URL 编解码(UTF-8 安全)、UUID v4 批量生成、哈希(MD5 纯 JS 实现 + SHA-1/256/512 WebCrypto);MD5 实现已过标准向量验证
 - 项目已 git 化(2026-09-18 首次提交),历史性能基准:`cargo test --release bench_throughput -- --ignored --nocapture`(1MiB vs 16MiB 块实测无差异,瓶颈在磁盘)
+
+### v0.1.2 新工具(2026-09-18)
+- **哈希页拆分「文件校验/文本哈希」两个子 Tab**(`.seg seg-sm`,display:none 不适用——哈希用条件渲染):文件校验走后端 `sb_hash_file`(流式一次读取喂 MD5/SHA-1/256/512 四个 hasher,RustCrypto md-5/sha1/sha2;进度事件 `hashfile://progress`,复用取消槽);交互与文本一致:**选文件与计算解耦**,「开始计算/取消/清空」按钮前置,拖入仅选中不自动计算且仅文件校验子页激活时响应
+- **第四个工具「二维码」**(registry id `qr`,`src/tools/qr/QrTool.tsx`,生成/识别子 Tab):
+  - 生成:npm `qrcode` 库画到 528px canvas(CSS 显示 264px),「保存图片」走系统保存对话框(plugin-dialog `save` + 新 Rust 命令 `save_data_file`),提示 toast 报文件名
+  - 识别:npm `jsqr` 纯前端解码;图片来源三种——拖入(onDragDropEvent,仅识别子页激活时响应)、点击选择(Rust `qr_read_image` 读文件→魔数嗅探 png/jpeg/gif/bmp/webp→base64 回前端)、**Ctrl+V 粘贴截图**(clipboard File 直接解);超大图等比缩到 ≤1600px 再识别;结果带复制按钮
+- **第五个工具「文本对比」**(registry id `diff`,`src/tools/diff/DiffTool.tsx`):
+  - 算法用 npm `diff`(jsdiff,Myers,纯 JS 零依赖,Jest 同款,稳定);行级 unified 视图:双行号槽、行首 +/− 标记、`+N −M` 统计、红绿底色、自动换行不出横向滚动
+  - 两侧均可「载入文件」(Rust `read_text_file`:UTF-8 优先,失败尝试 GBK);任一侧超 2MB toast 提示;超 4000 行截断显示;有左右交换/清空;完全一致时提示
+- 共享重构:`CopyButton` 抽到 `src/components/CopyButton.tsx`(DevTools 改为引用);`baseName` 移入 `src/lib/format.ts`
+- Rust 新命令(commands.rs):`qr_read_image`(>32MB 拒绝)、`save_data_file`、`read_text_file`(>4MB 拒绝);Cargo 新依赖 `base64 0.22`、`encoding_rs 0.8`;capabilities 加 `dialog:allow-save`(显式,防 default 不含 save)
+- 侧边栏现为 5 个工具;图标继续蓝色双色实心风(QrIcon=三个定位角+点阵、DiffIcon=浅/深双面板加减号,均在 registry.tsx)
 
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)

@@ -492,6 +492,71 @@ pub async fn sb_hash_file(
         .map_err(|e: Error| e.to_string())
 }
 
+/* ---------- 二维码与文本对比的辅助命令 ---------- */
+
+/// 读取图片并转为 base64,交由前端解码像素后识别二维码
+#[derive(Serialize)]
+pub struct QrImage {
+    pub base64: String,
+    pub mime: String,
+}
+
+#[tauri::command]
+pub fn qr_read_image(path: String) -> Result<QrImage, String> {
+    let bytes = fs::read(&path).map_err(|e| format!("读取失败：{e}"))?;
+    if bytes.len() > 32 * 1024 * 1024 {
+        return Err("图片超过 32MB，请压缩后再试".into());
+    }
+    let mime = if bytes.starts_with(&[0x89, b'P', b'N', b'G']) {
+        "image/png"
+    } else if bytes.starts_with(&[0xFF, 0xD8]) {
+        "image/jpeg"
+    } else if bytes.starts_with(b"GIF8") {
+        "image/gif"
+    } else if bytes.starts_with(b"BM") {
+        "image/bmp"
+    } else if bytes.len() > 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP" {
+        "image/webp"
+    } else {
+        return Err("仅支持 PNG、JPG、GIF、WebP、BMP 图片".into());
+    };
+    use base64::engine::general_purpose::STANDARD;
+    use base64::Engine as _;
+    Ok(QrImage {
+        base64: STANDARD.encode(&bytes),
+        mime: mime.to_string(),
+    })
+}
+
+/// 保存前端生成的数据(如二维码 PNG),路径来自系统保存对话框
+#[tauri::command]
+pub fn save_data_file(path: String, bytes: Vec<u8>) -> Result<(), String> {
+    if path.is_empty() {
+        return Err("没有选择保存位置".into());
+    }
+    fs::write(&path, bytes).map_err(|e| format!("保存失败：{e}"))
+}
+
+/// 读取文本文件,UTF-8 优先,非 UTF-8 时尝试 GBK,方便中文环境的老文件
+#[tauri::command]
+pub fn read_text_file(path: String) -> Result<String, String> {
+    let bytes = fs::read(&path).map_err(|e| format!("读取失败：{e}"))?;
+    if bytes.len() > 4 * 1024 * 1024 {
+        return Err("文件超过 4MB，请截取片段后比较".into());
+    }
+    match std::str::from_utf8(&bytes) {
+        Ok(s) => Ok(s.to_string()),
+        Err(_) => {
+            let (cow, _, had_errors) = encoding_rs::GBK.decode(&bytes);
+            if had_errors {
+                Ok(String::from_utf8_lossy(&bytes).into_owned())
+            } else {
+                Ok(cow.into_owned())
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

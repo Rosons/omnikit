@@ -35,6 +35,20 @@ export const tools: ToolModule[] = [
     icon: WrenchIcon,
     component: lazy(() => import("./devtools/DevTools")),
   },
+  {
+    id: "qr",
+    name: "二维码",
+    desc: "生成与识别二维码，全程本机处理",
+    icon: QrIcon,
+    component: lazy(() => import("./qr/QrTool")),
+  },
+  {
+    id: "diff",
+    name: "文本对比",
+    desc: "两段文本或文件逐行差异",
+    icon: DiffIcon,
+    component: lazy(() => import("./diff/DiffTool")),
+  },
 ];
 
 function FolderToolIcon({ size = 16 }: { size?: number }) {
@@ -58,6 +72,55 @@ function WrenchIcon({ size = 16 }: { size?: number }) {
       <path
         d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"
         fill="#06a7ff"
+      />
+    </svg>
+  );
+}
+
+function QrIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      {[
+        [3, 3],
+        [14, 3],
+        [3, 14],
+      ].map(([x, y]) => (
+        <path
+          key={`${x}-${y}`}
+          transform={`translate(${x - 3} ${y - 3})`}
+          fillRule="evenodd"
+          fill="#06a7ff"
+          d="M3 3h7v7H3zM4 4h5v5H4zM5 5h3v3H5z"
+        />
+      ))}
+      <rect x="12" y="14" width="2" height="2" fill="#06a7ff" />
+      <rect x="16" y="14" width="2" height="2" fill="#06a7ff" />
+      <rect x="20" y="14" width="2" height="2" fill="#06a7ff" />
+      <rect x="12" y="18" width="2" height="2" fill="#06a7ff" />
+      <rect x="16" y="18" width="2" height="2" fill="#06a7ff" />
+      <rect x="20" y="18" width="2" height="2" fill="#06a7ff" />
+      <rect x="14" y="12" width="2" height="2" fill="#9fcdfb" />
+      <rect x="18" y="12" width="2" height="2" fill="#9fcdfb" />
+    </svg>
+  );
+}
+
+function DiffIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3" y="5" width="8" height="14" rx="2" fill="#9fcdfb" />
+      <rect x="13" y="5" width="8" height="14" rx="2" fill="#06a7ff" />
+      <path
+        d="M5.8 12h2.4"
+        stroke="#ffffff"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <path
+        d="M17 10.8v2.4M15.8 12h2.4"
+        stroke="#ffffff"
+        strokeWidth="1.6"
+        strokeLinecap="round"
       />
     </svg>
   );

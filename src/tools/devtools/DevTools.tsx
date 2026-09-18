@@ -4,8 +4,9 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { md5 } from "./md5";
-import { fmtBytes } from "../../lib/format";
+import { fmtBytes, baseName } from "../../lib/format";
 import { showToast } from "../../components/Toast";
+import CopyButton from "../../components/CopyButton";
 
 const TABS = [
   { id: "json", name: "JSON" },
@@ -38,27 +39,6 @@ export default function DevTools() {
       {tab === "uuid" && <UuidTool />}
       {tab === "hash" && <HashTool />}
     </div>
-  );
-}
-
-/* ---------- 复制按钮 ---------- */
-function CopyButton({ text, label = "复制" }: { text: string; label?: string }) {
-  const [done, setDone] = useState(false);
-  return (
-    <button
-      className="btn-text"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          setDone(true);
-          setTimeout(() => setDone(false), 1500);
-        } catch {
-          /* 忽略 */
-        }
-      }}
-    >
-      {done ? "已复制" : label}
-    </button>
   );
 }
 
@@ -337,11 +317,6 @@ function UuidTool() {
 }
 
 /* ---------- 哈希 ---------- */
-function baseName(p: string): string {
-  const i = Math.max(p.lastIndexOf("\\"), p.lastIndexOf("/"));
-  return i >= 0 ? p.slice(i + 1) : p;
-}
-
 interface FileHashResult {
   file: string;
   size: number;

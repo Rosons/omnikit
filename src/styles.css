@@ -755,30 +755,47 @@ body {
   min-width: 0;
 }
 
-/* 哈希结果:固定算法列 + 单行横向滚动,行行等高对齐 */
+/* 哈希结果:算法+复制一行,值自然换行,无滚动条 */
 .hash-row {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: 8px 12px;
+  padding: 10px 12px;
   background: var(--fill);
   border-radius: var(--radius-s);
-  font-size: 12.5px;
 }
-.hash-algo { font-weight: 600; color: var(--text-2); }
+.hash-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.hash-algo { font-weight: 600; font-size: 12.5px; color: var(--text-2); }
 .hash-value {
-  min-width: 0;
+  margin-top: 6px;
   font-family: Consolas, "Cascadia Mono", monospace;
   font-size: 12px;
+  line-height: 1.7;
   color: var(--text-1);
-  white-space: nowrap;
-  overflow-x: auto;
-  padding: 3px 0;
+  word-break: break-all;
   user-select: text;
-  scrollbar-width: thin;
 }
-.hash-row .btn-text { flex: none; white-space: nowrap; }
+
+/* 空态占位框 */
+.placeholder-box {
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-l);
+  padding: 44px var(--sp-5);
+  text-align: center;
+  color: var(--text-3);
+  font-size: 13px;
+  background: var(--fill);
+}
+
+/* 选中态按钮(与普通按钮同高) */
+.btn-selected {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-dim);
+}
+.btn-selected:hover:not(:disabled) { background: var(--primary-dim); }
 
 /* 全局 toast(顶部居中,第一眼可见;空白处不挡点击) */
 .toast-host {

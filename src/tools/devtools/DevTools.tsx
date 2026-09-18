@@ -298,25 +298,25 @@ function UuidTool() {
   return (
     <div className="stack">
       <div className="tool-actions">
-        <span className="field-label">生成数量</span>
-        <select
-          className="input"
-          style={{ width: 96 }}
-          value={count}
-          onChange={(e) => setCount(Number(e.target.value))}
-        >
-          {[1, 5, 10, 50].map((n) => (
-            <option key={n} value={n}>
-              {n} 个
-            </option>
-          ))}
-        </select>
+        {[1, 5, 10, 50].map((n) => (
+          <button
+            key={n}
+            className={`btn ${count === n ? "btn-selected" : "btn-ghost"}`}
+            onClick={() => setCount(n)}
+          >
+            {n} 个
+          </button>
+        ))}
         <button className="btn btn-primary" onClick={generate}>
           生成 UUID v4
         </button>
         {list.length > 0 && <CopyButton text={list.join("\n")} label="复制全部" />}
       </div>
-      {list.length > 0 && (
+      {list.length === 0 ? (
+        <div className="placeholder-box">
+          选择数量后点击「生成 UUID v4」,结果会显示在这里
+        </div>
+      ) : (
         <div className="field">
           <textarea
             className="textarea"
@@ -391,11 +391,11 @@ function HashTool() {
       </div>
       {hashes.map((h) => (
         <div className="hash-row" key={h.algo}>
-          <span className="hash-algo">{h.algo}</span>
-          <span className="hash-value" title={h.value}>
-            {h.value}
-          </span>
-          <CopyButton text={h.value} />
+          <div className="hash-head">
+            <span className="hash-algo">{h.algo}</span>
+            <CopyButton text={h.value} />
+          </div>
+          <div className="hash-value">{h.value}</div>
         </div>
       ))}
     </div>

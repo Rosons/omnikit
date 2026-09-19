@@ -104,11 +104,11 @@ export default function LogTailTool() {
           placeholder="选择要监视的日志文件"
           spellCheck={false}
         />
-        <button className="btn btn-sm" onClick={pick}>
+        <button className="btn" onClick={pick}>
           浏览
         </button>
         {watching ? (
-          <button className="btn btn-sm" onClick={stop}>
+          <button className="btn" onClick={stop}>
             停止监视
           </button>
         ) : (
@@ -126,7 +126,7 @@ export default function LogTailTool() {
 
       <div className="tool-actions">
         <input
-          className="input input-sm"
+          className="input"
           style={{ width: 240 }}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
@@ -139,7 +139,7 @@ export default function LogTailTool() {
         >
           {follow ? "自动滚动·开" : "自动滚动·关"}
         </button>
-        <button className="btn btn-sm" onClick={() => setLines([])}>
+        <button className="btn" onClick={() => setLines([])}>
           清屏
         </button>
         {kw && <span className="hint">命中 {shown.length} 行</span>}

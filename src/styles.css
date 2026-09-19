@@ -897,7 +897,7 @@ body {
   word-break: break-all;
 }
 
-.btn-sm { height: 30px; padding: 0 12px; font-size: 12.5px; }
+.btn-sm { height: 28px; padding: 0 12px; font-size: 12.5px; }
 
 /* 文本域(小工具输入输出) */
 .textarea {

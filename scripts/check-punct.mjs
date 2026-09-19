@@ -22,7 +22,7 @@ for (const f of files) {
   let text = readFileSync(f, "utf8");
   // 整文件剥离块注释(支持跨行),再按行处理
   text = text.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
-  const lines = text.split("\n");
+  const lines = text.split(/\r?\n/);
   lines.forEach((line, i) => {
     let t = line;
     if (f.endsWith(".rs")) {

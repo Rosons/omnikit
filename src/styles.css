@@ -1453,7 +1453,7 @@ body {
 .size-bytes {
   flex: none;
   width: 76px;
-  text-align: right;
+  text-align: left;
   font-variant-numeric: tabular-nums;
   color: var(--text-1);
 }

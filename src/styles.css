@@ -168,6 +168,75 @@ body {
 }
 .switch.on .switch-knob { transform: translateX(18px); }
 
+/* ===== 自定义下拉 ===== */
+.dd { position: relative; flex: none; }
+.dd-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: 28px;
+  padding: 0 10px;
+  background: var(--card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-s);
+  color: var(--text-1);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color var(--fast);
+}
+.dd-btn:hover { border-color: var(--primary); }
+.dd-btn svg { flex: none; color: var(--text-3); transition: transform var(--fast); }
+.dd.open-btn svg,
+.dd-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.dd-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dd-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  z-index: 80;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: 0 8px 28px rgba(31, 35, 41, 0.16);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  max-height: 280px;
+  overflow-y: auto;
+  animation: dd-in 120ms var(--ease);
+}
+@keyframes dd-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+.dd-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--text-1);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dd-item:hover { background: var(--primary-dim); color: var(--primary); }
+.dd-item.sel { color: var(--primary); font-weight: 600; }
+.dd-item svg { flex: none; }
+
 .tool-item {
   display: flex;
   align-items: center;

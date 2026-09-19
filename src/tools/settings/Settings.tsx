@@ -4,6 +4,7 @@ import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { tools } from "../registry";
 import { showToast } from "../../components/Toast";
 import Switch from "../../components/Switch";
+import Dropdown from "../../components/Dropdown";
 
 interface AppSettings {
   close_to_tray: boolean;
@@ -105,19 +106,14 @@ export default function Settings() {
             <span className="kv-k" style={{ minWidth: 170 }}>
               启动时打开
             </span>
-            <select
-              className="input"
-              style={{ width: 200, height: 28 }}
+            <Dropdown
+              width={220}
               value={startPage}
-              onChange={(e) => setStart(e.target.value)}
-            >
-              <option value="last">记住上次页面</option>
-              {tools.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+              onChange={setStart}
+              options={
+                [{ value: "last", label: "记住上次页面" }, ...tools.map((t) => ({ value: t.id, label: t.name }))]
+              }
+            />
           </div>
         </div>
       </div>

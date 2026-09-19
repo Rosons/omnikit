@@ -189,6 +189,25 @@ function DupeView() {
         )}
       </div>
       {busy && <div className="hint">{phase || "准备中…"}</div>}
+      {!busy && !groups && (
+        <div className="empty-state">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <circle cx="10.5" cy="10.5" r="6.5" stroke="#9aa0ab" strokeWidth="2" />
+            <path
+              d="M15.5 15.5L20.5 20.5"
+              stroke="#9aa0ab"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+          <div className="empty-title">选择一个文件夹开始查找重复文件</div>
+          <div className="hint">
+            空文件会忽略；内容完全相同才判定重复（大小 → 抽样 → 完整校验）
+            <br />
+            删除均移入回收站，结果最多显示 500 组
+          </div>
+        </div>
+      )}
       {groups && (
         <div className="hint hint-ok">
           发现 {groups.length} 组重复文件
@@ -196,7 +215,19 @@ function DupeView() {
         </div>
       )}
       {groups && groups.length === 0 && (
-        <div className="port-empty">没有发现重复文件</div>
+        <div className="empty-state">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <circle cx="10.5" cy="10.5" r="6.5" stroke="#9aa0ab" strokeWidth="2" />
+            <path
+              d="M15.5 15.5L20.5 20.5"
+              stroke="#9aa0ab"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+          <div className="empty-title">没有发现重复文件</div>
+          <div className="hint">该文件夹内没有内容完全相同的文件</div>
+        </div>
       )}
       {groups &&
         groups.map((g, gi) => (
@@ -228,7 +259,6 @@ function DupeView() {
             </div>
           </div>
         ))}
-      <div className="hint">空文件忽略；先按大小分组、再抽样比对、最后完整校验确认；删除均进回收站，最多显示 500 组</div>
     </div>
   );
 }
@@ -306,6 +336,18 @@ function SizeView() {
         )}
       </div>
       {busy && <div className="hint">{scanText || "准备中…"}</div>}
+      {!busy && !report && (
+        <div className="empty-state">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <circle cx="12" cy="12" r="9" stroke="#9aa0ab" strokeWidth="2" />
+            <path d="M12 3a9 9 0 0 1 9 9h-9z" fill="#9aa0ab" opacity="0.5" />
+          </svg>
+          <div className="empty-title">选择一个文件夹开始大小分析</div>
+          <div className="hint">
+            按占用排序列出一级子项（可下钻），并列出目录内最大的文件
+          </div>
+        </div>
+      )}
       {report && (
         <>
           <div className="hint hint-ok">

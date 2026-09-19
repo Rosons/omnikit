@@ -19,6 +19,7 @@ export default function Dropdown({ value, options, onChange, width = 220 }: Drop
   const [pos, setPos] = useState({ top: 0, left: 0, width });
   const rootRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const current = options.find((o) => o.value === value);
 
   function toggle() {
@@ -35,7 +36,9 @@ export default function Dropdown({ value, options, onChange, width = 220 }: Drop
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    function onScroll() {
+    function onScroll(e: Event) {
+      // 菜单内部滚动不关闭,只防页面滚动导致浮层错位
+      if (menuRef.current?.contains(e.target as Node)) return;
       setOpen(false);
     }
     window.addEventListener("mousedown", onDown);
@@ -79,7 +82,7 @@ export default function Dropdown({ value, options, onChange, width = 220 }: Drop
         </svg>
       </button>
       {open && (
-        <div className="dd-menu" style={{ position: "fixed", top: pos.top, left: pos.left, minWidth: pos.width }}>
+        <div className="dd-menu" ref={menuRef} style={{ position: "fixed", top: pos.top, left: pos.left, minWidth: pos.width }}>
           {options.map((o) => (
             <button
               type="button"

@@ -150,8 +150,12 @@ fn index_worker(
             }
             let p = entry.path();
             let lossy = p.to_string_lossy();
-            if lossy.len() == 3 && lossy.ends_with('\\') {
-                continue; // 跳过盘符根本身
+            #[cfg(windows)]
+            {
+                let lossy = p.to_string_lossy();
+                if lossy.len() == 3 && lossy.ends_with('\\') {
+                    continue; // 跳过盘符根本身(仅 Windows)
+                }
             }
             if entry.file_type().is_file() {
                 if let Some(ext) = p.extension() {

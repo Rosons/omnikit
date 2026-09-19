@@ -592,13 +592,16 @@ pub struct PortEntry {
     pub start: u64,
 }
 
+/// 拆出地址与端口,兼容 IPv6 方括号写法(双平台共用)
+fn split_addr(s: &str) -> Option<(String, u16)> {
+    let idx = s.rfind(':')?;
+    let port = s[idx + 1..].parse::<u16>().ok()?;
+    Some((s[..idx].trim_matches(['[', ']']).to_string(), port))
+}
+
+#[cfg(windows)]
 /// 解析 netstat -ano 输出:仅保留 TCP LISTENING 与全部 UDP 行
 fn parse_netstat(output: &str) -> Vec<PortEntry> {
-    fn split_addr(s: &str) -> Option<(String, u16)> {
-        let idx = s.rfind(':')?;
-        let port = s[idx + 1..].parse::<u16>().ok()?;
-        Some((s[..idx].trim_matches(['[', ']']).to_string(), port))
-    }
     let mut out = Vec::new();
     for line in output.lines() {
         let parts: Vec<&str> = line.split_whitespace().collect();
@@ -644,6 +647,48 @@ fn parse_netstat(output: &str) -> Vec<PortEntry> {
         }
     }
     out
+}
+
+#[cfg(target_os = "macos")]
+/// macOS:用 lsof 收集监听端口(TCP LISTEN + 全部 UDP)
+fn collect_port_rows() -> Result<Vec<PortEntry>, String> {
+    let mut out = Vec::new();
+    for (args, proto) in [
+        (vec!["-iTCP", "-sTCP:LISTEN", "-P", "-n"], "TCP"),
+        (vec!["-iUDP", "-P", "-n"], "UDP"),
+    ] {
+        let out_text = Command::new("lsof")
+            .args(&args)
+            .output()
+            .map_err(|e| format!("无法执行 lsof：{e}"))?;
+        let text = String::from_utf8_lossy(&out_text.stdout);
+        for line in text.lines().skip(1) {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() < 9 {
+                continue;
+            }
+            let Ok(pid) = parts[1].parse::<u32>() else { continue };
+            let Some((address, port)) = split_addr(parts[8]) else { continue };
+            out.push(PortEntry {
+                proto: proto.into(),
+                address,
+                port,
+                pid,
+                name: String::new(),
+                path: None,
+                cmd: None,
+                mem: 0,
+                start: 0,
+            });
+        }
+    }
+    Ok(out)
+}
+
+#[cfg(windows)]
+fn collect_port_rows() -> Result<Vec<PortEntry>, String> {
+    let text = run_gbk_cmd("netstat", &["-ano"]).map_err(|e| format!("无法执行 netstat：{e}"))?;
+    Ok(parse_netstat(&text))
 }
 
 fn run_gbk_cmd(program: &str, args: &[&str]) -> std::io::Result<String> {
@@ -698,8 +743,7 @@ fn process_details() -> std::collections::HashMap<u32, ProcDetail> {
 }
 
 fn list_ports_impl() -> Result<Vec<PortEntry>, String> {
-    let text = run_gbk_cmd("netstat", &["-ano"]).map_err(|e| format!("无法执行 netstat：{e}"))?;
-    let mut entries = parse_netstat(&text);
+    let mut entries = collect_port_rows()?;
     let details = process_details();
     for e in entries.iter_mut() {
         if let Some(d) = details.get(&e.pid) {
@@ -726,20 +770,35 @@ pub async fn net_list_ports() -> Result<Vec<PortEntry>, String> {
 
 #[tauri::command]
 pub fn net_kill(pid: u32) -> Result<(), String> {
-    let out = hidden_command("taskkill")
-        .args(["/F", "/PID", &pid.to_string()])
-        .output()
-        .map_err(|e| format!("无法执行 taskkill：{e}"))?;
-    if out.status.success() {
-        return Ok(());
+    #[cfg(windows)]
+    {
+        let out = hidden_command("taskkill")
+            .args(["/F", "/PID", &pid.to_string()])
+            .output()
+            .map_err(|e| format!("无法执行 taskkill：{e}"))?;
+        if out.status.success() {
+            return Ok(());
+        }
+        let (so, _, _) = encoding_rs::GBK.decode(&out.stdout);
+        let (se, _, _) = encoding_rs::GBK.decode(&out.stderr);
+        let so = so.trim();
+        let se = se.trim();
+        let msg = if so.is_empty() { se } else { so };
+        let msg = if msg.is_empty() { "未知错误" } else { msg };
+        Err(format!("结束进程（PID {pid}）失败：{msg}"))
     }
-    let (so, _, _) = encoding_rs::GBK.decode(&out.stdout);
-    let (se, _, _) = encoding_rs::GBK.decode(&out.stderr);
-    let so = so.trim();
-    let se = se.trim();
-    let msg = if so.is_empty() { se } else { so };
-    let msg = if msg.is_empty() { "未知错误" } else { msg };
-    Err(format!("结束进程（PID {pid}）失败：{msg}"))
+    #[cfg(not(windows))]
+    {
+        let st = Command::new("kill")
+            .args(["-9", &pid.to_string()])
+            .status()
+            .map_err(|e| format!("无法执行 kill：{e}"))?;
+        if st.success() {
+            Ok(())
+        } else {
+            Err(format!("结束进程（PID {pid}）失败：权限不足或进程已退出"))
+        }
+    }
 }
 
 /* ---------- TCP 连通测试 ---------- */

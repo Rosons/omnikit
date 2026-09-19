@@ -223,6 +223,13 @@ devtoolbox/
 - **文件搜索**(id `fsearch`,文件工具组,Everything 式):`search.rs` 后台线程 walkdir 遍历选定磁盘(`filter_entry` 按排除关键字剪枝,默认 node_modules 等,可编辑存 localStorage),进度事件 `idx://progress`;索引存内存 `Arc<Vec<Box<str>>>`(读写锁换 Arc 零成本读),完成后 **flate2 gz 压缩缓存**到 appdata,下次启动工具页自动加载;查询小写子串匹配、300 条截断;结果行复制+「位置」;磁盘选择胶囊(sys_overview 的挂载点)
 - **配置转换**(数据工具箱子 Tab「配置」,js-yaml):YAML→JSON、JSON→YAML、properties→YAML、YAML→properties 四向;properties 点号键按层级拆解/合并(unflatten/flatten),注释(# !)与 =/: 分隔符支持
 - **应用更名 OmniKit**(用户提出「不只是开发工具箱」):productName/窗口标题/托盘/侧栏品牌(> _ 标识)/设置关于全部同步;**identifier 保持 com.devtoolbox.desktop 不变**(保住设置/历史/索引缓存);Crate 内部名 devtoolbox 不变;图标源改为 **assets/app-icon.svg**(矢量,`npx tauri icon assets/app-icon.svg -o src-tauri/icons` 出全套;make-icon.mjs 已删);候选预览在 assets/preview-a|b|c
+- **产品文案去掉「个人」说辞**(用户要求):副标题「百宝工具箱」、关于「v0.8.0 · 百宝工具箱 · …」;侧栏品牌标识底色改蓝色渐变(原 primary-dim 太浅,白色 >_ 看不清)
+- **内部命名统一 omnikit**:mainBinaryName=OmniKit(免安装 exe 更名)、localStorage 键 omnikit.*、bus 事件 omnikit:navigate、快捷键提示文字;**identifier 与数据目录 com.devtoolbox.desktop 故意不改**(保用户数据);localStorage 键改名会重置侧栏折叠/启动页一次(已告知用户,开发阶段可接受)
+- **修复「打开软件啥也没有」**:退出钩子曾把**最小化窗口**的 -32000,0 几何存进 settings.json,下次启动恢复到屏幕外。双重防护:Exit 保存时 is_minimized/width==0 跳过;启动恢复时校验尺寸≥400x300 且中心在主屏内,否则放弃恢复
+- **macOS 适配 + CI 云构建**(用户拍板「两个都要,mac 走 CI」):
+  - 代码双实现:sb_reveal 原有三分支;`collect_port_rows()` Windows=netstat 解析、**macOS=lsof**(`-iTCP -sTCP:LISTEN`/`-iUDP`),split_addr 抽共用;net_kill Windows=taskkill、macOS=kill -9;search 盘符根跳过加 #[cfg(windows)];磁盘分析面包屑分隔符按 UA 检测
+  - **`.github/workflows/build.yml`**:workflow_dispatch + v* tag 触发;windows-latest 出 NSIS、macos-latest 出 app+dmg;**CI 必须设 `CARGO_TARGET_DIR=./target`**(本地 .cargo/config.toml 把 target-dir 指到 E:\DevEnv,CI 无效);npm ci + dtolnay/rust-toolchain@stable;产物 upload-artifact
+  - 注意:mac 包未签名,Gatekeeper 需右键打开;mac cfg 分支本地无法编译验证,以 CI 为准
 - 侧边栏现为 **4 组 18 个工具**;新图标 SearchIcon/ClipboardIcon;教训:python 补丁里 `\\n` 经 heredoc 传递会变真换行(已两次),转义类内容一律 Write 脚本文件;registry 补丁注意 anchor 自带尾逗号导致的数组空洞
 - **文件搜索排除规则移入设置页**(用户建议):settings.json 加 `search_excludes`(路径关键字,内置 node_modules/.git/.venv/__pycache__/$recycle.bin/system volume information/pagefile.sys/hiberfil.sys/swapfile.sys)与 `search_exclude_exts`(后缀,内置 tmp/temp/lnk)两个字段,serde(default=函数)保证老配置文件也拿到内置默认;设置页「文件搜索·排除规则」区(关键字/后缀两个 textarea,失焦保存);索引时目录关键字用 filter_entry 整枝剪枝、后缀只跳过文件;search_start 不再从前端收 excludes
 - **文件搜索索引范围可视化**(用户反馈):索引完成时写元数据 `search-index.meta.json`(roots/files/time),缓存加载时一并读回;status 返回 roots;进入页面自动勾选**上次索引的范围**(用户手动改动后不再覆盖),状态行显示「范围 C:\、D:\」;勾选范围与已建索引不一致时红字提示「重新索引将按新范围重建」

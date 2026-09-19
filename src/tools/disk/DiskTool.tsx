@@ -315,16 +315,22 @@ function SizeView() {
 
   // 面包屑:把当前路径拆成可点击的层级
   const crumbs = (() => {
-    const parts = dir.trim().replace(/\//g, "\\").split("\\").filter(Boolean);
+    // 按平台选分隔符(macOS 为 /,Windows 为 反斜杠)
+    const SEP = /Mac/i.test(navigator.userAgent) ? "/" : "\\";
+    const parts = dir.trim().split(/[\\/]/).filter(Boolean);
     const out: { name: string; path: string }[] = [];
     let acc = "";
     for (let i = 0; i < parts.length; i++) {
-      if (i === 0) acc = parts[0].endsWith(":") ? parts[0] + "\\" : parts[0];
-      else acc = acc.endsWith("\\") ? acc + parts[i] : acc + "\\" + parts[i];
-      out.push({ name: i === 0 && parts[0].endsWith(":") ? parts[0] + "\\" : parts[i], path: acc });
+      if (i === 0) acc = parts[0].endsWith(":") ? parts[0] + SEP : SEP + parts[0];
+      else acc = acc.endsWith(SEP) ? acc + parts[i] : acc + SEP + parts[i];
+      out.push({
+        name: i === 0 && parts[0].endsWith(":") ? parts[0] + SEP : parts[i],
+        path: acc,
+      });
     }
     return out;
   })();
+
   const parentPath = crumbs.length > 1 ? crumbs[crumbs.length - 2].path : null;
 
   return (

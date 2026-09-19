@@ -1449,6 +1449,16 @@ body {
   overflow: hidden;
 }
 .size-bar > div { height: 100%; background: var(--primary); border-radius: 3px; }
+/* 右侧列固定宽度,让占比条纵向对齐 */
+.size-bytes {
+  flex: none;
+  width: 76px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-1);
+}
+.size-count { flex: none; width: 76px; color: var(--text-2); font-size: 12.5px; }
+.size-enter { flex: none; width: 44px; text-align: center; }
 
 /* 大小分析面包屑导航 */
 .crumb-bar {

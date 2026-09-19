@@ -1180,7 +1180,8 @@ fn dir_sizes_impl(
             files,
         });
     }
-    items.sort_by(|a, b| b.bytes.cmp(&a.bytes));
+    // 目录在前、文件在后,各自内部按占用降序
+    items.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then(b.bytes.cmp(&a.bytes)));
     Ok(DirReport {
         total_bytes: items.iter().map(|i| i.bytes).sum(),
         total_files: items.iter().map(|i| i.files).sum(),

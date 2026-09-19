@@ -305,7 +305,11 @@ function SizeView() {
     }
   }
 
-  const maxBytes = report && report.items.length > 0 ? report.items[0].bytes : 1;
+  // 混合目录与文件,取全体的最大值作为占比条基准
+  const maxBytes =
+    report && report.items.length > 0
+      ? Math.max(...report.items.map((i) => i.bytes), 1)
+      : 1;
 
   // 面包屑:把当前路径拆成可点击的层级
   const crumbs = (() => {

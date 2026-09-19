@@ -224,6 +224,7 @@ devtoolbox/
 - **配置转换**(数据工具箱子 Tab「配置」,js-yaml):YAML→JSON、JSON→YAML、properties→YAML、YAML→properties 四向;properties 点号键按层级拆解/合并(unflatten/flatten),注释(# !)与 =/: 分隔符支持
 - 侧边栏现为 **4 组 18 个工具**;新图标 SearchIcon/ClipboardIcon;教训:python 补丁里 `\\n` 经 heredoc 传递会变真换行(已两次),转义类内容一律 Write 脚本文件;registry 补丁注意 anchor 自带尾逗号导致的数组空洞
 - **文件搜索排除规则移入设置页**(用户建议):settings.json 加 `search_excludes`(路径关键字,内置 node_modules/.git/.venv/__pycache__/$recycle.bin/system volume information/pagefile.sys/hiberfil.sys/swapfile.sys)与 `search_exclude_exts`(后缀,内置 tmp/temp/lnk)两个字段,serde(default=函数)保证老配置文件也拿到内置默认;设置页「文件搜索·排除规则」区(关键字/后缀两个 textarea,失焦保存);索引时目录关键字用 filter_entry 整枝剪枝、后缀只跳过文件;search_start 不再从前端收 excludes
+- **文件搜索索引范围可视化**(用户反馈):索引完成时写元数据 `search-index.meta.json`(roots/files/time),缓存加载时一并读回;status 返回 roots;进入页面自动勾选**上次索引的范围**(用户手动改动后不再覆盖),状态行显示「范围 C:\、D:\」;勾选范围与已建索引不一致时红字提示「重新索引将按新范围重建」
 - 设置页开关用 `Switch` 组件(`src/components/Switch.tsx`),下拉用 `Dropdown` 组件(`src/components/Dropdown.tsx`,菜单 fixed 定位防 kv-list overflow 裁剪,菜单内滚动不关闭、页面滚动才收起、贴底自动上弹)
 
 ### 剩余手动验收(需真人操作)

@@ -9,6 +9,7 @@ interface SearchStatus {
   indexing: boolean;
   files: number;
   last_time: number;
+  roots: string[];
 }
 
 interface DiskInfo {
@@ -26,9 +27,16 @@ export default function FileSearchTool() {
   const timer = useRef<number | undefined>(undefined);
   const qTimer = useRef<number | undefined>(undefined);
 
+  const rootsTouched = useRef(false);
+
   async function refreshStatus() {
     try {
-      setStatus(await invoke<SearchStatus>("search_status"));
+      const st = await invoke<SearchStatus>("search_status");
+      setStatus(st);
+      // 上次索引过:自动勾选当时的范围,避免与索引实际范围不符
+      if (!rootsTouched.current && st.roots.length > 0 && !st.indexing) {
+        setRoots(new Set(st.roots));
+      }
     } catch {
       /* 忽略 */
     }
@@ -59,6 +67,7 @@ export default function FileSearchTool() {
   }, [status, results, q]);
 
   function toggleRoot(m: string) {
+    rootsTouched.current = true;
     setRoots((s) => {
       const n = new Set(s);
       if (n.has(m)) n.delete(m);
@@ -68,6 +77,7 @@ export default function FileSearchTool() {
   }
 
   async function startIndexing() {
+    rootsTouched.current = true;
     try {
       await invoke("search_start", {
         roots: [...roots],
@@ -107,11 +117,19 @@ export default function FileSearchTool() {
 
   const readyText = useMemo(() => {
     if (!status) return "";
+    const scope = status.roots.length > 0 ? ` · 范围 ${status.roots.join("、")}` : "";
     if (status.indexing) return `索引中，已发现 ${status.files.toLocaleString()} 个文件`;
     if (status.files > 0)
-      return `索引就绪 · ${status.files.toLocaleString()} 个文件 · 建于 ${fmtTime(status.last_time)}`;
+      return `索引就绪 · ${status.files.toLocaleString()} 个文件${scope} · 建于 ${fmtTime(status.last_time)}`;
     return "尚未建立索引";
   }, [status]);
+
+  // 勾选范围与已建索引范围不一致时提醒
+  const scopeMismatch = useMemo(() => {
+    if (!status || status.indexing || status.roots.length === 0) return false;
+    if (roots.size !== status.roots.length) return true;
+    return [...roots].some((r) => !status.roots.includes(r));
+  }, [status, roots]);
 
   return (
     <div className="stack fsearch-page">
@@ -123,6 +141,11 @@ export default function FileSearchTool() {
         <span className="hint">
           首次索引会遍历整个磁盘（可能需要几分钟），完成后压缩缓存到本机，下次启动自动加载；输入即搜，结果按需截取
         </span>
+        {scopeMismatch && (
+          <span className="hint hint-error">
+            当前勾选范围与已建索引不同，搜索结果不含新勾选的磁盘；点「开始索引」按新范围重建
+          </span>
+        )}
         <div className="tool-actions">
           <div className="diff-opts">
             {disks.map((d) => (

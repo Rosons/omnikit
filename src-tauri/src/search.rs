@@ -2,7 +2,7 @@
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
@@ -12,12 +12,20 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 use walkdir::WalkDir;
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct IndexMeta {
+    pub roots: Vec<String>,
+    pub files: u64,
+    pub time: u64,
+}
+
 #[derive(Default, Clone)]
 pub struct SearchState {
     pub paths: Arc<RwLock<Arc<Vec<Box<str>>>>>,
     pub indexing: Arc<AtomicBool>,
     pub stop: Arc<AtomicBool>,
     pub last_time: Arc<Mutex<u64>>,
+    pub meta: Arc<Mutex<Option<IndexMeta>>>,
 }
 
 #[derive(Serialize, Clone)]
@@ -25,6 +33,7 @@ pub struct SearchStatus {
     pub indexing: bool,
     pub files: usize,
     pub last_time: u64,
+    pub roots: Vec<String>,
 }
 
 fn cache_path(app: &AppHandle) -> Option<PathBuf> {
@@ -36,6 +45,26 @@ fn now() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0)
+}
+
+fn meta_path(app: &AppHandle) -> Option<PathBuf> {
+    app.path().app_data_dir().ok().map(|d| d.join("search-index.meta.json"))
+}
+
+fn save_meta(app: &AppHandle, meta: &IndexMeta) {
+    let Some(p) = meta_path(app) else { return };
+    if let Some(dir) = p.parent() {
+        let _ = fs::create_dir_all(dir);
+    }
+    if let Ok(t) = serde_json::to_string_pretty(meta) {
+        let _ = fs::write(&p, t);
+    }
+}
+
+fn load_meta(app: &AppHandle) -> Option<IndexMeta> {
+    let p = meta_path(app)?;
+    let t = fs::read_to_string(p).ok()?;
+    serde_json::from_str(&t).ok()
 }
 
 fn save_cache(app: &AppHandle, paths: &Arc<Vec<Box<str>>>) {
@@ -122,6 +151,13 @@ fn index_worker(
     if !stopped && files > 0 {
         let paths = state.paths.read().unwrap().clone();
         save_cache(&app, &paths);
+        let meta = IndexMeta {
+            roots: roots.clone(),
+            files: files as u64,
+            time: now(),
+        };
+        save_meta(&app, &meta);
+        *state.meta.lock().unwrap() = Some(meta);
     }
     let _ = started.elapsed();
 }
@@ -165,6 +201,13 @@ pub fn search_status(state: tauri::State<'_, SearchState>) -> SearchStatus {
         indexing: state.indexing.load(Ordering::Relaxed),
         files: state.paths.read().unwrap().len(),
         last_time: *state.last_time.lock().unwrap(),
+        roots: state
+            .meta
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|m| m.roots.clone())
+            .unwrap_or_default(),
     }
 }
 
@@ -193,6 +236,10 @@ pub async fn search_cache_load(app: AppHandle, state: tauri::State<'_, SearchSta
                     *st.last_time.lock().unwrap() = d.as_secs();
                 }
             }
+        }
+        if let Some(m) = load_meta(&app2) {
+            *st.last_time.lock().unwrap() = m.time;
+            *st.meta.lock().unwrap() = Some(m);
         }
         *st.paths.write().unwrap() = Arc::new(vec);
         let files = st.paths.read().unwrap().len();

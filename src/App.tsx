@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { tools } from "./tools/registry";
 import { ToastHost } from "./components/Toast";
+import { ConfirmHost } from "./components/ConfirmDialog";
 
 export default function App() {
   const [activeId, setActiveId] = useState(tools[0].id);
@@ -74,6 +75,7 @@ export default function App() {
         </div>
       </main>
       <ToastHost />
+      <ConfirmHost />
     </div>
   );
 }

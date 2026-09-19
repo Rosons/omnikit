@@ -170,6 +170,8 @@ devtoolbox/
   - 重复查找:`disk_find_dupes` 四步流水(递归收集非空文件→按大小分组→首 4KB MD5 抽样预筛→全量 MD5 确认),进度事件 `dup://progress`(scan/part/hash 三阶段),复用 cancel_slot 取消;结果按可释放空间降序最多 500 组;每组内文件可「位置」(sb_reveal)/「删除」(`disk_trash` 用 **trash 3** 进回收站),组级「保留第一个其余删除」
   - 大小分析:`disk_dir_sizes` 递归累计一级子项(字节+文件数),进度事件 `dirsz://progress`,Top20 大文件原地维护;前端占比条形图+「进入」下钻(重新扫子目录)
 - 新增依赖:ureq 2、trash 3;新命令 6 个;新图标 HttpIcon 地球/ColorIcon 水滴/DiskIcon 饼图
+- **确认弹窗应用内化**(用户反馈原生框风格突兀):`src/components/ConfirmDialog.tsx` 提供 `showConfirm(opts)`(Promise 布尔)+ `<ConfirmHost />` 挂在 App;应用风格遮罩弹窗,支持 danger 红色确认按钮(删除/结束进程用)、回车确认、Esc/点遮罩取消;替换了端口结束进程与磁盘两处原生 confirm
+- **控件高度体系**:标准 36(input/btn)、紧凑 28(input-sm/btn-sm/btn-chip/工具栏内 opt-chip);所有「同一行混合输入框+按钮」的工具栏一律 28;独立字段与全尺寸按钮行保持 36;新增工具栏行时必须同规格
 
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)

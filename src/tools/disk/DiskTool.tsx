@@ -1,7 +1,8 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { open, confirm } from "@tauri-apps/plugin-dialog";
+import { open } from "@tauri-apps/plugin-dialog";
+import { showConfirm } from "../../components/ConfirmDialog";
 import { showToast } from "../../components/Toast";
 import { fmtBytes } from "../../lib/format";
 
@@ -110,9 +111,11 @@ function DupeView() {
   }
 
   async function trashFile(path: string, groupIdx: number) {
-    const ok = await confirm(`确定把该文件移入回收站？\n${path}`, {
+    const ok = await showConfirm({
       title: "删除文件",
-      kind: "warning",
+      message: `确定把该文件移入回收站？\n${path}`,
+      confirmLabel: "移入回收站",
+      danger: true,
     });
     if (!ok) return;
     try {
@@ -137,10 +140,12 @@ function DupeView() {
   async function keepFirst(groupIdx: number) {
     const g = groups?.[groupIdx];
     if (!g) return;
-    const ok = await confirm(
-      `保留第一个文件，其余 ${g.files.length - 1} 个移入回收站？`,
-      { title: "批量删除", kind: "warning" },
-    );
+    const ok = await showConfirm({
+      title: "批量删除",
+      message: `保留第一个文件，其余 ${g.files.length - 1} 个移入回收站？`,
+      confirmLabel: "移入回收站",
+      danger: true,
+    });
     if (!ok) return;
     try {
       for (const f of g.files.slice(1)) {
@@ -159,7 +164,7 @@ function DupeView() {
     <div className="stack">
       <div className="tool-actions">
         <input
-          className="input input-mono http-hv"
+          className="input input-sm input-mono http-hv"
           value={dir}
           onChange={(e) => setDir(e.target.value)}
           placeholder="选择要查找的文件夹"
@@ -276,7 +281,7 @@ function SizeView() {
     <div className="stack">
       <div className="tool-actions">
         <input
-          className="input input-mono http-hv"
+          className="input input-sm input-mono http-hv"
           value={dir}
           onChange={(e) => setDir(e.target.value)}
           placeholder="选择要分析的文件夹"

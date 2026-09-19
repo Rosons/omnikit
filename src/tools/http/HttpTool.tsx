@@ -84,7 +84,7 @@ export default function HttpTool() {
             ))}
           </div>
           <input
-            className="input input-mono http-url"
+            className="input input-sm input-mono http-url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://"

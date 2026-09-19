@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { confirm } from "@tauri-apps/plugin-dialog";
+import { showConfirm } from "../../components/ConfirmDialog";
 import { showToast } from "../../components/Toast";
 import { fmtBytes, fmtTime } from "../../lib/format";
 
@@ -75,7 +75,7 @@ function ProbeView() {
         <span className="field-label">目标地址与端口（TCP 连接测试，超时 3 秒）</span>
         <div className="probe-row">
           <input
-            className="input input-mono"
+            className="input input-sm input-mono"
             style={{ flex: 1 }}
             value={host}
             onChange={(e) => setHost(e.target.value)}
@@ -87,7 +87,7 @@ function ProbeView() {
           />
           <span className="probe-colon">:</span>
           <input
-            className="input input-mono"
+            className="input input-sm input-mono"
             style={{ width: 100 }}
             value={port}
             onChange={(e) => setPort(e.target.value)}
@@ -174,10 +174,12 @@ function ListenView() {
   }, [rows, q, proto]);
 
   async function kill(r: PortRow) {
-    const ok = await confirm(
-      `确定结束进程「${r.name}」（PID ${r.pid}）？该进程会被立即强制关闭。`,
-      { title: "结束进程", kind: "warning" },
-    );
+    const ok = await showConfirm({
+      title: "结束进程",
+      message: `确定结束进程「${r.name}」（PID ${r.pid}）？该进程会被立即强制关闭。`,
+      confirmLabel: "结束进程",
+      danger: true,
+    });
     if (!ok) return;
     try {
       await invoke("net_kill", { pid: r.pid });
@@ -197,7 +199,7 @@ function ListenView() {
     <div className="stack listen-page">
       <div className="tool-actions">
         <input
-          className="input"
+          className="input input-sm"
           style={{ width: 240 }}
           value={q}
           onChange={(e) => setQ(e.target.value)}

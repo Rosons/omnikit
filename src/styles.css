@@ -892,6 +892,39 @@ body {
 }
 /* 端口进程详情弹窗:更宽以容纳完整路径 */
 .port-modal { width: 560px; }
+
+/* ===== 应用内确认弹窗 ===== */
+.confirm-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 400px;
+  max-width: calc(100vw - 48px);
+  padding: 20px 22px 18px;
+  background: var(--card);
+  border-radius: var(--radius-l);
+  box-shadow: 0 18px 48px rgba(31, 35, 41, 0.22);
+  animation: modal-in 160ms var(--ease);
+}
+.confirm-title { font-size: 14px; font-weight: 600; color: var(--text-1); }
+.confirm-message {
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.6;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #ffffff;
+  font-weight: 500;
+}
+.btn-danger:hover:not(:disabled) {
+  background: #ff6b6b;
+  border-color: #ff6b6b;
+}
 @keyframes modal-in {
   from { opacity: 0; transform: scale(0.94) translateY(8px); }
   to { opacity: 1; transform: none; }
@@ -1328,6 +1361,8 @@ body {
 /* ===== HTTP 测试 ===== */
 .http-row { display: flex; align-items: center; gap: 10px; }
 .http-row .seg { margin-bottom: 0; flex: none; }
+.http-method { padding: 2px; }
+.http-method .seg-btn { padding: 3px 12px; font-size: 12.5px; }
 .http-url { flex: 1; min-width: 0; }
 .http-header-row {
   display: flex;
@@ -1419,7 +1454,7 @@ body {
 .btn-sm { height: 28px; padding: 0 16px; font-size: 12.5px; }
 /* 与 opt-chip 同规格的胶囊按钮(端口工具栏的刷新) */
 .btn-chip {
-  height: 24px;
+  height: 28px;
   padding: 0 12px;
   font-size: 12px;
   border-radius: 999px;
@@ -1430,6 +1465,13 @@ body {
   color: var(--primary);
   border-color: var(--primary);
   background: var(--primary-dim);
+}
+/* 工具栏行里的胶囊统一 28px,与 input-sm/btn-sm 同高 */
+.tool-actions .opt-chip {
+  height: 28px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
 }
 
 /* 正则 flags 徽标:字母独立成块,避免与中文基线不齐 */

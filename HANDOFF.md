@@ -230,6 +230,9 @@ omnikit/
   - 代码双实现:sb_reveal 原有三分支;`collect_port_rows()` Windows=netstat 解析、**macOS=lsof**(`-iTCP -sTCP:LISTEN`/`-iUDP`),split_addr 抽共用;net_kill Windows=taskkill、macOS=kill -9;search 盘符根跳过加 #[cfg(windows)];磁盘分析面包屑分隔符按 UA 检测
   - **`.github/workflows/build.yml`**:workflow_dispatch + v* tag 触发;windows-latest 出 NSIS、macos-latest 出 app+dmg;**CI 必须设 `CARGO_TARGET_DIR=./target`**(本地 .cargo/config.toml 把 target-dir 指到 E:\DevEnv,CI 无效);npm ci + dtolnay/rust-toolchain@stable;产物 upload-artifact
   - 注意:mac 包未签名,Gatekeeper 需右键打开;mac cfg 分支本地无法编译验证,以 CI 为准
+- **CI 发布链路补全**:build.yml 增加 release 任务(双平台构建成功后自动创建 GitHub Release 附 exe/dmg;发布过滤只留安装包本体);首轮构建曾因标点检查误报失败——**根因:Windows CI 检出为 CRLF,检查脚本按 
+ 切行致注释剥离正则失配**;已修复脚本(split /?
+/)并新增 **.gitattributes 统一 eol=lf** 根治
 - 侧边栏现为 **4 组 18 个工具**;新图标 SearchIcon/ClipboardIcon;教训:python 补丁里 `\\n` 经 heredoc 传递会变真换行(已两次),转义类内容一律 Write 脚本文件;registry 补丁注意 anchor 自带尾逗号导致的数组空洞
 - **文件搜索排除规则移入设置页**(用户建议):settings.json 加 `search_excludes`(路径关键字,内置 node_modules/.git/.venv/__pycache__/$recycle.bin/system volume information/pagefile.sys/hiberfil.sys/swapfile.sys)与 `search_exclude_exts`(后缀,内置 tmp/temp/lnk)两个字段,serde(default=函数)保证老配置文件也拿到内置默认;设置页「文件搜索·排除规则」区(关键字/后缀两个 textarea,失焦保存);索引时目录关键字用 filter_entry 整枝剪枝、后缀只跳过文件;search_start 不再从前端收 excludes
 - **文件搜索索引范围可视化**(用户反馈):索引完成时写元数据 `search-index.meta.json`(roots/files/time),缓存加载时一并读回;status 返回 roots;进入页面自动勾选**上次索引的范围**(用户手动改动后不再覆盖),状态行显示「范围 C:\、D:\」;勾选范围与已建索引不一致时红字提示「重新索引将按新范围重建」

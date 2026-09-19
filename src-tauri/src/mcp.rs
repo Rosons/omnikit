@@ -350,7 +350,7 @@ fn do_initialize(sess: &McpSession) -> Result<McpInfo, String> {
         json!({
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {},
-            "clientInfo": { "name": "DevToolbox", "version": "0.4" }
+            "clientInfo": { "name": "OmniKit", "version": "0.8" }
         }),
     )?;
     sess.notify("notifications/initialized", json!({}))?;

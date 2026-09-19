@@ -1,4 +1,4 @@
-# DevToolbox 项目交接文档
+# OmniKit 项目交接文档(原名 DevToolbox,2026-09-19 更名;项目目录名暂为 devtoolbox,其余已全部更名)
 
 > 用途:在新会话中继续开发。本文档自包含全部上下文,无需原会话历史。
 > 更新时间:2026-09-18(**v0.1.2 已新增二维码/文本对比工具并出包**,见第四节「v0.1.2」)
@@ -26,9 +26,9 @@
 
 - **Tauri 2 + React 19 + TypeScript + Vite 6**（前端）/ **Rust stable**（后端）
 - cargo crates 走 **rsproxy 镜像**（已配置）；npm 已是 npmmirror
-- 应用名 `DevToolbox`，identifier `com.devtoolbox.desktop`，项目路径：
+- 应用名 `OmniKit`，identifier `com.omnikit.desktop`，项目路径：
   `E:\projects\ai-projects\devtoolbox`
-- 构建产物重定向：`src-tauri/.cargo/config.toml` → `E:\DevEnv\targets\devtoolbox`（保护 C 盘）
+- 构建产物重定向：`src-tauri/.cargo/config.toml` → `E:\DevEnv\targets\omnikit`（保护 C 盘）
 - 打包目标：NSIS（注意：首次 `tauri build` 会从 GitHub 下载 NSIS 工具，国内可能慢/失败；失败则改 bundle targets 为 `[]` 只出裸 exe）
 
 ## 三、环境状态（全部已装好，勿重装）
@@ -53,7 +53,7 @@ export CARGO_HOME='E:\DevEnv\cargo'
 
 ### 已写入的文件（完整，无需重写）
 ```
-devtoolbox/
+omnikit/
 ├── package.json                  # react19/@tauri-apps/api2/plugin-dialog2/vite6/ts5，scripts: dev/build/tauri
 ├── tsconfig.json                 # strict、noEmit、react-jsx、moduleResolution bundler
 ├── vite.config.ts                # port 1420 strictPort、clearScreen false
@@ -62,12 +62,12 @@ devtoolbox/
 └── src-tauri/
     ├── Cargo.toml                # 依赖：tauri2、tauri-plugin-dialog 2、serde/serde_json、
     │                             #   aes-gcm 0.10、argon2 0.5、rand 0.8、walkdir 2、zeroize 1
-    │                             #   [lib] name="devtoolbox_lib" crate-type=["rlib"]
+    │                             #   [lib] name="omnikit_lib" crate-type=["rlib"]
     │                             #   release: lto+strip+opt-level=s
     ├── build.rs                  # tauri_build::build()
     ├── tauri.conf.json           # 窗口 1000x660 min860x560、dragDropEnabled、bundle nsis、
     │                             #   icons 引用 icon.ico/32x32/128x128/128x128@2x
-    ├── .cargo/config.toml        # target-dir → E:\DevEnv\targets\devtoolbox
+    ├── .cargo/config.toml        # target-dir → E:\DevEnv\targets\omnikit
     └── capabilities/default.json # permissions: core:default, dialog:default
 ```
 
@@ -80,15 +80,15 @@ devtoolbox/
 4. ~~npm install~~ ✅
 5. ~~cargo test~~ ✅ 3/3 通过(round-trip 含嵌套/空文件/非 1MiB 整数倍/错密码/冲突拒绝覆盖/非 .box 识别)
 6. ~~npx tauri build~~ ✅ NSIS 下载成功,产物:
-   - 裸 exe:`E:\DevEnv\targets\devtoolbox\release\devtoolbox.exe`(3.3 MB)
-   - 安装包:`E:\DevEnv\targets\devtoolbox\release\bundle\nsis\DevToolbox_0.1.0_x64-setup.exe`(1.2 MB)
+   - 裸 exe:`E:\DevEnv\targets\omnikit\release\omnikit.exe`(3.3 MB)
+   - 安装包:`E:\DevEnv\targets\omnikit\release\bundle\nsis\OmniKit_0.1.0_x64-setup.exe`(1.2 MB)
 
 ### 实现偏差备忘(与原设计的差异)
 - **meta_len 是明文 JSON 字节数**:磁盘上 meta 密文 = meta_len + 16B tag;unpack 须读 `meta_len+16` 字节,数据区起点 = `71 + meta_len + 16`(踩过的坑)
 - pack 读取文件用 `read_exact` 严格按 1MiB 切块(与 unpack 的切块对齐,不能依赖 read 返回值)
 - pack 结束先写 `<output>.part`,rename 前若 output 已存在则先删(Windows rename 不能覆盖)
 - 进度 emit 在 commands 层做 100ms 节流;密码用 `Zeroizing<String>` 包裹
-- 项目已从 `C:\Users\31288\.zcode\workspace\default\devtoolbox` 迁移到 **`E:\projects\ai-projects\devtoolbox`**
+- 项目路径:**`E:\projects\ai-projects\devtoolbox`**(目录名保留旧名,待会话结束后由用户自行更名)
 
 ### v0.1.1 UI 改版(2026-09-18,用户反馈"AI 风格太重、布局丑")
 - **整体换浅色网盘风**(百度网盘式清爽):白卡片 + 蓝主色 `#06A7FF`、1px 边框、扁平无渐变发光;`src/styles.css` 全量重写
@@ -100,7 +100,7 @@ devtoolbox/
 - 大文件夹扫描加 loading(表格内 spinner + `scanSeqRef` 序号防竞态;`clearAll` 作废进行中的扫描)
 - 文案产品化:删掉算法参数 badges、"密码错误会立即提示"等讨论式说明;仅保留"密码丢失后无法找回"和"本地处理,数据不出设备"两条关键信息
 - **新增「文件管理」工具**(v0.1.0 第二个工具,验证了插件架构):
-  - 后端 `history.rs`:记录存 `%APPDATA%\com.devtoolbox.desktop\history.json`(tmp+rename 原子写,上限 200 条);`sb_encrypt/sb_decrypt` 成功后自动记录(kind/name/boxPath/location/files/bytes/time),失败静默不影响主流程
+  - 后端 `history.rs`:记录存 `%APPDATA%\com.omnikit.desktop\history.json`(tmp+rename 原子写,上限 200 条);`sb_encrypt/sb_decrypt` 成功后自动记录(kind/name/boxPath/location/files/bytes/time),失败静默不影响主流程
   - 命令:`sb_history_list / sb_history_remove / sb_history_clear`
   - 前端 `src/tools/history/History.tsx`:类型徽标(加密蓝/解密绿)+ 名称/位置双行 + 时间 + 内容统计 + 打开/删除,二次确认式清空;工具在 `registry.tsx` 注册为 `filemgr`
 - placeholder 统一:`.input::placeholder` 强制正文字体(输出位置输入框是等宽字体,之前 placeholder 跟随导致与密码框不一致)
@@ -176,7 +176,7 @@ devtoolbox/
 ### v0.3.1 侧边栏分组(2026-09-19,方案 B)
 - 12 个工具已到单列侧边栏上限,按用户确认的**方案 B(侧边栏分组,非顶部模块)**改造:
   - `registry.tsx`:`ToolModule` 增加 `group: ToolGroup`(file/dev/misc),导出 `GROUPS`(文件工具/开发工具/常用工具);**新工具注册时必须填 group**
-  - App.tsx:侧边栏按组渲染,组头可点击折叠(chevron 旋转);折叠状态存 localStorage(`devtoolbox.sidebar.collapsed`);切换到某工具时自动展开其所在分组
+  - App.tsx:侧边栏按组渲染,组头可点击折叠(chevron 旋转);折叠状态存 localStorage(`omnikit.sidebar.collapsed`);切换到某工具时自动展开其所在分组
   - 样式:`.tool-group/.group-head`;`.tool-list` 改为可滚动(flex:1 + overflow-y)
   - 后续工具超约 18 个时,可升级为方案 A(顶部模块 + 每模块左侧菜单),分组数据同一套,迁移无废功
 
@@ -191,7 +191,7 @@ devtoolbox/
 ### v0.5.0 MCP 测试(2026-09-19)
 - **新工具「MCP 测试」**(id `mcp`,开发工具组,`src/tools/mcp/McpTool.tsx` + `src-tauri/src/mcp.rs` 独立模块,侧边栏现为 4 组 14 个工具):
   - **双传输**:stdio(本地命令,支持引号分词 `split_command_line`,CREATE_NO_WINDOW 隐藏窗口,后台线程读 stdout 按行解析 JSON-RPC、stderr 进日志)与 Streamable HTTP(POST JSON-RPC,Accept 同时带 json 与 event-stream,自动维护 `Mcp-Session-Id`,响应可为 JSON 或 SSE,自定义请求头给鉴权);旧版 HTTP+SSE(2024-11-05 GET /sse)传输未做
-  - JSON-RPC 手写实现(顺序请求+id 匹配+30s 超时):initialize(协议版本 2025-06-18,clientInfo DevToolbox)→ notifications/initialized → tools/list、tools/call、resources/list、prompts/list;收发消息全记日志(上限 200 条,单条截断 2000 字)
+  - JSON-RPC 手写实现(顺序请求+id 匹配+30s 超时):initialize(协议版本 2025-06-18,clientInfo OmniKit)→ notifications/initialized → tools/list、tools/call、resources/list、prompts/list;收发消息全记日志(上限 200 条,单条截断 2000 字)
   - Rust:`McpState(Mutex<Option<Arc<McpSession>>>)` 独立 manage;stdio 会话 Drop 杀子进程;**lib.rs 从 `.run(ctx)` 改为 `.build(ctx).run(callback)`,RunEvent::Exit 时清掉 McpState 结束残留子进程**;hidden_command 改 pub(crate) 供 mcp.rs 复用
   - 前端:连接卡片(stdio/http 切换+目标输入+http 请求头行)→ 连接后服务器信息 chips(名称版本/协议版本/能力中文标签)+ instructions 提示条 → 工具列表(名称/描述/调用按钮,选中高亮)→ 调用区(Schema 可折叠 pre、**按 JSON Schema 自动生成参数模板**——只填必填项无必填填全部、enum 取第一个、default 优先)→ 结果(成功/失败 chip+耗时、文本内容、原始 JSON 切换、复制);资源/提示列表;JSON-RPC 日志折叠面板;断开/退出清理
 - 已知边界:tools/resources 分页游标未处理(取第一页);服务端主动请求(采样/根目录)仅记日志不响应;子进程孙进程(如 npx→node)不保证级联结束
@@ -211,7 +211,7 @@ devtoolbox/
   - 关闭时最小化到托盘:`on_window_event` CloseRequested 拦截 hide;设置持久化在 **`settings.rs`**(`%APPDATA%/settings.json`,tmp+rename;`SettingsState(Mutex<AppSettings>)` setup 时 manage;`settings_get/settings_set` 命令)
   - 记住窗口大小和位置:RunEvent::Exit 保存 outer_position+inner_size+maximized;setup 恢复(Physical 单位)
   - 开机自启:**tauri-plugin-autostart**(写 HKCU Run 注册表),capabilities 加 allow-enable/disable/is-enabled
-  - 启动页:localStorage(`devtoolbox.startPage`=last 或工具 id;`devtoolbox.lastPage` 每次切换记录),App.tsx 初始化时读取
+  - 启动页:localStorage(`omnikit.startPage`=last 或工具 id;`omnikit.lastPage` 每次切换记录),App.tsx 初始化时读取
 - **数据工具箱扩到 11 个子 Tab**(新增 URL/批处理/进制/Base64;组件在 `src/tools/devtools/more.tsx` 独立模块,DevTools.tsx 引入):URL 解析(new URL+searchParams 自动解码,组成部分与查询参数逐项复制)、文本批处理(去重/排序/反转/去空行/Trim/大小写/全角转半角,点按即生效+20 步撤销)、进制换算(BigInt,2/8/10/16 互转,合法字符校验)、文件转 Base64(Rust `read_file_base64` 上限 16MB,输出纯 Base64 与 data URI,按扩展名映射 MIME)
 - `.seg` 加 flex-wrap(11 个子 Tab 需换行);**教训:长内容严禁 bash heredoc 直写文件(两次被截断损坏,改用 Write 工具或脚本文件)**
 - **新功能必须有用途说明**(用户要求):四个新子页(URL/批处理/进制/Base64)标题下补了 `.hint` 用途一句话;数据工具箱 desc 更新为列全部子项;**今后新增工具/子页,输入区上方或下方必须有一句「这是干啥的」**
@@ -222,9 +222,9 @@ devtoolbox/
 - **全局快捷键**:**tauri-plugin-global-shortcut**(Rust 侧注册,无需 capability);`register_hotkey` Alt+Q 显示/隐藏主窗口;settings 加 `hotkey_enabled`(默认开),设置页 Switch 动态注册/注销;lib.rs 插件初始化用 `Builder::new().build()`
 - **文件搜索**(id `fsearch`,文件工具组,Everything 式):`search.rs` 后台线程 walkdir 遍历选定磁盘(`filter_entry` 按排除关键字剪枝,默认 node_modules 等,可编辑存 localStorage),进度事件 `idx://progress`;索引存内存 `Arc<Vec<Box<str>>>`(读写锁换 Arc 零成本读),完成后 **flate2 gz 压缩缓存**到 appdata,下次启动工具页自动加载;查询小写子串匹配、300 条截断;结果行复制+「位置」;磁盘选择胶囊(sys_overview 的挂载点)
 - **配置转换**(数据工具箱子 Tab「配置」,js-yaml):YAML→JSON、JSON→YAML、properties→YAML、YAML→properties 四向;properties 点号键按层级拆解/合并(unflatten/flatten),注释(# !)与 =/: 分隔符支持
-- **应用更名 OmniKit**(用户提出「不只是开发工具箱」):productName/窗口标题/托盘/侧栏品牌(> _ 标识)/设置关于全部同步;**identifier 保持 com.devtoolbox.desktop 不变**(保住设置/历史/索引缓存);Crate 内部名 devtoolbox 不变;图标源改为 **assets/app-icon.svg**(矢量,`npx tauri icon assets/app-icon.svg -o src-tauri/icons` 出全套;make-icon.mjs 已删);候选预览在 assets/preview-a|b|c
+- **应用更名 OmniKit**(用户提出「不只是开发工具箱」):productName/窗口标题/托盘/侧栏品牌(> _ 标识)/设置关于全部同步;**identifier 保持 com.omnikit.desktop 不变**(保住设置/历史/索引缓存);Crate 内部名 omnikit 不变;图标源改为 **assets/app-icon.svg**(矢量,`npx tauri icon assets/app-icon.svg -o src-tauri/icons` 出全套;make-icon.mjs 已删);候选预览在 assets/preview-a|b|c
 - **产品文案去掉「个人」说辞**(用户要求):副标题「百宝工具箱」、关于「v0.8.0 · 百宝工具箱 · …」;侧栏品牌标识底色改蓝色渐变(原 primary-dim 太浅,白色 >_ 看不清)
-- **内部命名统一 omnikit**:mainBinaryName=OmniKit(免安装 exe 更名)、localStorage 键 omnikit.*、bus 事件 omnikit:navigate、快捷键提示文字;**identifier 与数据目录 com.devtoolbox.desktop 故意不改**(保用户数据);localStorage 键改名会重置侧栏折叠/启动页一次(已告知用户,开发阶段可接受)
+- **内部命名统一 omnikit**:mainBinaryName=OmniKit(免安装 exe 更名)、localStorage 键 omnikit.*、bus 事件 omnikit:navigate、快捷键提示文字;**identifier 与数据目录 com.omnikit.desktop 故意不改**(保用户数据);localStorage 键改名会重置侧栏折叠/启动页一次(已告知用户,开发阶段可接受)
 - **修复「打开软件啥也没有」**:退出钩子曾把**最小化窗口**的 -32000,0 几何存进 settings.json,下次启动恢复到屏幕外。双重防护:Exit 保存时 is_minimized/width==0 跳过;启动恢复时校验尺寸≥400x300 且中心在主屏内,否则放弃恢复
 - **macOS 适配 + CI 云构建**(用户拍板「两个都要,mac 走 CI」):
   - 代码双实现:sb_reveal 原有三分支;`collect_port_rows()` Windows=netstat 解析、**macOS=lsof**(`-iTCP -sTCP:LISTEN`/`-iUDP`),split_addr 抽共用;net_kill Windows=taskkill、macOS=kill -9;search 盘符根跳过加 #[cfg(windows)];磁盘分析面包屑分隔符按 UA 检测
@@ -270,7 +270,7 @@ devtoolbox/
 - 密码用完 `zeroize`
 
 ### Rust 模块划分（src-tauri/src/）
-- `main.rs`：`windows_subsystem` attr + 调 `devtoolbox_lib::run()`
+- `main.rs`：`windows_subsystem` attr + 调 `omnikit_lib::run()`
 - `lib.rs`：Builder + `.plugin(tauri_plugin_dialog::init())` + `generate_handler![sb_encrypt, sb_decrypt, sb_reveal]`
 - `crypto.rs`：derive_key / encrypt_piece / decrypt_piece / make_nonce / PieceKind / build_aad
 - `format.rs`：MAGIC、CHUNK_SIZE=1MiB、header 偏移常量、BoxMeta/MetaFile(serde)
@@ -288,7 +288,7 @@ devtoolbox/
 ## 六、推荐执行顺序
 
 ```bash
-cd /e/projects/ai-projects/devtoolbox
+cd /e/projects/ai-projects/omnikit
 export PATH="/e/DevEnv/cargo/bin:$PATH"; export RUSTUP_HOME='E:\DevEnv\rustup'; export CARGO_HOME='E:\DevEnv\cargo'
 npm install                                  # npmmirror，快
 node scripts/make-icon.mjs && npx tauri icon assets/icon.png -o src-tauri/icons

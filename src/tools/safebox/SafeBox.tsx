@@ -262,7 +262,7 @@ export default function SafeBox() {
   async function browseOutput() {
     const sel = await save({
       defaultPath: output || "保险箱.box",
-      filters: [{ name: "DevToolbox 保险箱", extensions: ["box"] }],
+      filters: [{ name: "OmniKit 保险箱", extensions: ["box"] }],
     });
     if (typeof sel === "string") setOutput(sel);
   }
@@ -270,7 +270,7 @@ export default function SafeBox() {
   async function pickBox() {
     const sel = await open({
       multiple: false,
-      filters: [{ name: "DevToolbox 保险箱", extensions: ["box"] }],
+      filters: [{ name: "OmniKit 保险箱", extensions: ["box"] }],
     });
     if (typeof sel === "string") {
       clearRunState();

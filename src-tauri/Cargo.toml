@@ -1,11 +1,11 @@
 [package]
-name = "devtoolbox"
+name = "omnikit"
 version = "0.8.0"
 edition = "2021"
 description = "开发者个人工具箱"
 
 [lib]
-name = "devtoolbox_lib"
+name = "omnikit_lib"
 crate-type = ["rlib"]
 
 [build-dependencies]

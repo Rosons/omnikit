@@ -927,7 +927,7 @@ pub async fn http_request(
         }
         let mut req = ureq::request(&upper, url.trim())
             .timeout(Duration::from_secs(30))
-            .set("User-Agent", "DevToolbox/0.2");
+            .set("User-Agent", "OmniKit/0.8");
         for (k, v) in &headers {
             let k = k.trim();
             let v = v.trim();

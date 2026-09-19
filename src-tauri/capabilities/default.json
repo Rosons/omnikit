@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "DevToolbox 主窗口默认权限",
+  "description": "OmniKit 主窗口默认权限",
   "windows": ["main"],
   "permissions": ["core:default", "dialog:default", "dialog:allow-save", "autostart:allow-enable", "autostart:allow-disable", "autostart:allow-is-enabled"]
 }

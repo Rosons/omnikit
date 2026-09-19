@@ -68,6 +68,10 @@ export default function HttpTool() {
         ? " c-redir"
         : " c-err";
 
+  // 请求体按内容行数自适应高度:空时一行高,最多 200px
+  const bodyLines = body ? body.split("\n").length : 1;
+  const bodyHeight = Math.min(200, Math.max(46, 14 + bodyLines * 18));
+
   return (
     <div className="stack http-page">
       <div className="field http-flex-none">
@@ -134,15 +138,19 @@ export default function HttpTool() {
         ))}
       </div>
 
-      <div className="field http-flex-none">
-        <span className="field-label">请求体（GET 忽略；Content-Type 用请求头自行指定）</span>
-        <textarea
-          className="textarea http-body-input"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          spellCheck={false}
-        />
-      </div>
+      {method !== "GET" && (
+        <div className="field http-flex-none">
+          <span className="field-label">请求体（Content-Type 用请求头自行指定）</span>
+          <textarea
+            className="textarea input-mono http-body-input"
+            style={{ height: bodyHeight }}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="空请求体可不填"
+            spellCheck={false}
+          />
+        </div>
+      )}
 
       {res && (
         <>
@@ -153,7 +161,7 @@ export default function HttpTool() {
           </div>
           <div className="field http-flex-none">
             <span className="field-label">响应头</span>
-            <div className="kv-list http-h-clip">
+            <div className="kv-list">
               {res.headers.map(([k, v]) => (
                 <div className="kv-row" key={k}>
                   <span className="kv-k" style={{ minWidth: 140 }}>

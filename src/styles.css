@@ -1400,17 +1400,13 @@ body {
   flex: 1;
   min-height: 0;
 }
-.http-body { flex: 3; }
+.http-body { flex: 3; min-height: 160px; }
 .http-body .textarea,
 .http-body-out {
   height: 100%;
   resize: none;
 }
-.http-body-input { height: 72px; }
-.http-h-clip {
-  max-height: 140px;
-  overflow-y: auto;
-}
+.http-body-input { min-height: 46px; }
 .http-row { display: flex; align-items: center; gap: 10px; }
 .http-row .seg { margin-bottom: 0; flex: none; }
 .http-method { padding: 2px; }

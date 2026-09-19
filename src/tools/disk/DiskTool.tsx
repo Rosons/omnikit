@@ -310,6 +310,8 @@ function SizeView() {
     report && report.items.length > 0
       ? Math.max(...report.items.map((i) => i.bytes), 1)
       : 1;
+  // 列表里存在目录时才保留文件数/进入列,纯文件列表不占位
+  const hasDir = report ? report.items.some((i) => i.is_dir) : false;
 
   // 面包屑:把当前路径拆成可点击的层级
   const crumbs = (() => {
@@ -407,16 +409,16 @@ function SizeView() {
                   <span className="kv-v size-bytes">{fmtBytes(it.bytes)}</span>
                   {it.is_dir ? (
                     <span className="size-count">{it.files} 个文件</span>
-                  ) : (
+                  ) : hasDir ? (
                     <span className="size-count" />
-                  )}
+                  ) : null}
                   {it.is_dir ? (
                     <button className="btn-text size-enter" onClick={() => scan(it.path)}>
                       进入
                     </button>
-                  ) : (
+                  ) : hasDir ? (
                     <span className="size-enter" />
-                  )}
+                  ) : null}
                 </div>
               ))}
             </div>

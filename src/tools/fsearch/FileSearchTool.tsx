@@ -114,7 +114,7 @@ export default function FileSearchTool() {
   }, [status]);
 
   return (
-    <div className="stack">
+    <div className="stack fsearch-page">
       <div className="field">
         <span className="field-label">
           全盘文件名索引

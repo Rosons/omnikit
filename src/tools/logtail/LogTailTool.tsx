@@ -112,7 +112,7 @@ export default function LogTailTool() {
             停止监视
           </button>
         ) : (
-          <button className="btn btn-primary btn-sm" onClick={start} disabled={!path.trim()}>
+          <button className="btn btn-primary" onClick={start} disabled={!path.trim()}>
             开始监视
           </button>
         )}

@@ -1987,7 +1987,7 @@ details.mcp-log pre {
 }
 /* 与标准按钮(.btn 36px)同行的胶囊,放大到同高 */
 .tool-actions:has(> .btn:not(.btn-sm):not(.btn-chip)) .opt-chip,
-.diff-opts:has(+ .btn.btn-primary) .opt-chip,
+.diff-opts:has(+ .btn.btn-primary:not(.btn-sm)) .opt-chip,
 .opt-chip-lg {
   height: 36px;
   padding: 0 16px;

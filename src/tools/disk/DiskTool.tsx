@@ -164,26 +164,26 @@ function DupeView() {
     <div className="stack">
       <div className="tool-actions">
         <input
-          className="input input-sm input-mono http-hv"
+          className="input input-mono http-hv"
           value={dir}
           onChange={(e) => setDir(e.target.value)}
           placeholder="选择要查找的文件夹"
           spellCheck={false}
         />
-        <button className="btn btn-sm" onClick={pick}>
+        <button className="btn" onClick={pick}>
           浏览
         </button>
         {busy ? (
-          <button className="btn btn-sm" onClick={() => invoke("sb_cancel").catch(() => {})}>
+          <button className="btn" onClick={() => invoke("sb_cancel").catch(() => {})}>
             取消
           </button>
         ) : (
-          <button className="btn btn-primary btn-sm" onClick={start} disabled={!dir.trim()}>
+          <button className="btn btn-primary" onClick={start} disabled={!dir.trim()}>
             开始查找
           </button>
         )}
         {!busy && groups && (
-          <button className="btn btn-sm" onClick={() => setGroups(null)}>
+          <button className="btn" onClick={() => setGroups(null)}>
             清空
           </button>
         )}
@@ -281,26 +281,26 @@ function SizeView() {
     <div className="stack">
       <div className="tool-actions">
         <input
-          className="input input-sm input-mono http-hv"
+          className="input input-mono http-hv"
           value={dir}
           onChange={(e) => setDir(e.target.value)}
           placeholder="选择要分析的文件夹"
           spellCheck={false}
         />
-        <button className="btn btn-sm" onClick={pick}>
+        <button className="btn" onClick={pick}>
           浏览
         </button>
         {busy ? (
-          <button className="btn btn-sm" onClick={() => invoke("sb_cancel").catch(() => {})}>
+          <button className="btn" onClick={() => invoke("sb_cancel").catch(() => {})}>
             取消
           </button>
         ) : (
-          <button className="btn btn-primary btn-sm" onClick={() => scan()} disabled={!dir.trim()}>
+          <button className="btn btn-primary" onClick={() => scan()} disabled={!dir.trim()}>
             开始扫描
           </button>
         )}
         {!busy && report && (
-          <button className="btn btn-sm" onClick={() => setReport(null)}>
+          <button className="btn" onClick={() => setReport(null)}>
             清空
           </button>
         )}

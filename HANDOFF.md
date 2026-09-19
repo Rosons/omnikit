@@ -171,7 +171,7 @@ devtoolbox/
   - 大小分析:`disk_dir_sizes` 递归累计一级子项(字节+文件数),进度事件 `dirsz://progress`,Top20 大文件原地维护;前端占比条形图+「进入」下钻(重新扫子目录)
 - 新增依赖:ureq 2、trash 3;新命令 6 个;新图标 HttpIcon 地球/ColorIcon 水滴/DiskIcon 饼图
 - **确认弹窗应用内化**(用户反馈原生框风格突兀):`src/components/ConfirmDialog.tsx` 提供 `showConfirm(opts)`(Promise 布尔)+ `<ConfirmHost />` 挂在 App;应用风格遮罩弹窗,支持 danger 红色确认按钮(删除/结束进程用)、回车确认、Esc/点遮罩取消;替换了端口结束进程与磁盘两处原生 confirm
-- **控件高度体系**:标准 36(input/btn)、紧凑 28(input-sm/btn-sm/btn-chip/工具栏内 opt-chip);所有「同一行混合输入框+按钮」的工具栏一律 28;独立字段与全尺寸按钮行保持 36;新增工具栏行时必须同规格
+- **控件高度体系**:标准 36(input/btn)、紧凑 28(input-sm/btn-sm/btn-chip/工具栏内 opt-chip);铁律是**同一行内控件必须同高**——磁盘分析工具栏用户嫌扁改回全尺寸 36,端口/HTTP/连通测试工具栏保持 28 紧凑;新增工具栏行时任选一档但行内统一
 
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)

@@ -1430,7 +1430,13 @@ body {
   gap: 6px;
   color: var(--text-2);
 }
-.kv-v { color: var(--text-1); font-variant-numeric: tabular-nums; }
+.kv-v {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
 
 .jwt-chip {
   font-size: 12px;

@@ -1321,7 +1321,11 @@ pub async fn proc_list() -> Result<Vec<ProcEntry>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
         let mut sys = System::new();
-        let kind = ProcessRefreshKind::nothing().with_exe(UpdateKind::Always);
+        // nothing() 的 cpu/memory 开关默认关闭,必须显式开启
+        let kind = ProcessRefreshKind::nothing()
+            .with_memory()
+            .with_cpu()
+            .with_exe(UpdateKind::Always);
         sys.refresh_processes_specifics(ProcessesToUpdate::All, true, kind);
         std::thread::sleep(Duration::from_millis(300));
         sys.refresh_processes_specifics(ProcessesToUpdate::All, true, kind);

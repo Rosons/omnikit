@@ -10,6 +10,7 @@ import { md5 } from "./md5";
 import { fmtBytes, fmtDuration, fmtTime, baseName } from "../../lib/format";
 import { showToast } from "../../components/Toast";
 import CopyButton from "../../components/CopyButton";
+import { UrlTool, TextBatchTool, RadixTool, FileB64Tool } from "./more";
 
 const TABS = [
   { id: "json", name: "JSON" },
@@ -19,6 +20,10 @@ const TABS = [
   { id: "hash", name: "哈希" },
   { id: "jwt", name: "JWT" },
   { id: "sql", name: "SQL" },
+  { id: "url", name: "URL" },
+  { id: "text", name: "批处理" },
+  { id: "radix", name: "进制" },
+  { id: "b64", name: "Base64" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -45,6 +50,10 @@ export default function DevTools() {
       {tab === "hash" && <HashTool />}
       {tab === "jwt" && <JwtTool />}
       {tab === "sql" && <SqlTool />}
+      {tab === "url" && <UrlTool />}
+      {tab === "text" && <TextBatchTool />}
+      {tab === "radix" && <RadixTool />}
+      {tab === "b64" && <FileB64Tool />}
     </div>
   );
 }

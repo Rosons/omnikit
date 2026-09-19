@@ -132,6 +132,16 @@ body {
 .group-head svg { transition: transform var(--fast); }
 .group-head:not(.open) svg { transform: rotate(-90deg); }
 
+/* 侧边栏设置入口 */
+.sidebar-settings {
+  flex: none;
+  padding: 6px 0 4px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .tool-item {
   display: flex;
   align-items: center;
@@ -345,6 +355,7 @@ body {
 /* 分段 Tab */
 .seg {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 4px;
   padding: 3px;
   background: var(--fill-2);

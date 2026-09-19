@@ -1499,6 +1499,29 @@ pub fn path_exists(path: String) -> Result<bool, String> {
     Ok(Path::new(&path).exists())
 }
 
+/// 读取任意文件转 Base64(文件转 Base64 工具用),上限 16MB
+#[derive(Serialize)]
+pub struct FileB64 {
+    pub base64: String,
+    pub size: u64,
+}
+
+#[tauri::command]
+pub async fn read_file_base64(path: String) -> Result<FileB64, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let meta = fs::metadata(&path).map_err(|e| format!("读取失败：{e}"))?;
+        if meta.len() > 16 * 1024 * 1024 {
+            return Err("文件超过 16MB，请先压缩或换小文件".into());
+        }
+        let bytes = fs::read(&path).map_err(|e| format!("读取失败：{e}"))?;
+        use base64::engine::general_purpose::STANDARD;
+        use base64::Engine as _;
+        Ok(FileB64 { base64: STANDARD.encode(&bytes), size: meta.len() })
+    })
+    .await
+    .map_err(|e| format!("任务执行失败：{e}"))?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

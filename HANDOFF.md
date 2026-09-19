@@ -205,6 +205,16 @@ devtoolbox/
 - **破坏性操作确认全覆盖**(用户要求):文件管理记录删除/清空改用 showConfirm(替换原两步内联确认);**新增 `path_exists` 命令**,保险箱加密时若输出位置已有同名 .box,先弹红色「覆盖确认」再执行;端口/进程/磁盘删除此前已接 showConfirm
 - **修复进程管理 CPU/内存恒为 0**:sysinfo `ProcessRefreshKind::nothing()` 的 cpu/memory 开关默认关闭,需显式 `.with_memory().with_cpu()`;侧边栏不可滚动:grid 行高需 `grid-template-rows: minmax(0,1fr)` 锁定,否则内容把行撑出视口
 
+### v0.7.0 托盘/设置页 + 数据工具箱 4 子页(2026-09-19)
+- **系统托盘**:tauri 加 `tray-icon` feature;setup 里构建托盘(默认窗口图标+tooltip),左键单击恢复窗口,右键菜单(显示/退出);`tauri.conf.json` 主窗口 `visible: false`,setup 恢复几何后再 show
+- **设置页**(侧边栏底部固定入口,齿轮图标,非注册表工具;`src/tools/settings/Settings.tsx`):
+  - 关闭时最小化到托盘:`on_window_event` CloseRequested 拦截 hide;设置持久化在 **`settings.rs`**(`%APPDATA%/settings.json`,tmp+rename;`SettingsState(Mutex<AppSettings>)` setup 时 manage;`settings_get/settings_set` 命令)
+  - 记住窗口大小和位置:RunEvent::Exit 保存 outer_position+inner_size+maximized;setup 恢复(Physical 单位)
+  - 开机自启:**tauri-plugin-autostart**(写 HKCU Run 注册表),capabilities 加 allow-enable/disable/is-enabled
+  - 启动页:localStorage(`devtoolbox.startPage`=last 或工具 id;`devtoolbox.lastPage` 每次切换记录),App.tsx 初始化时读取
+- **数据工具箱扩到 11 个子 Tab**(新增 URL/批处理/进制/Base64;组件在 `src/tools/devtools/more.tsx` 独立模块,DevTools.tsx 引入):URL 解析(new URL+searchParams 自动解码,组成部分与查询参数逐项复制)、文本批处理(去重/排序/反转/去空行/Trim/大小写/全角转半角,点按即生效+20 步撤销)、进制换算(BigInt,2/8/10/16 互转,合法字符校验)、文件转 Base64(Rust `read_file_base64` 上限 16MB,输出纯 Base64 与 data URI,按扩展名映射 MIME)
+- `.seg` 加 flex-wrap(11 个子 Tab 需换行);**教训:长内容严禁 bash heredoc 直写文件(两次被截断损坏,改用 Write 工具或脚本文件)**
+
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)
 

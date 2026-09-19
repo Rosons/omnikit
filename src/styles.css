@@ -1449,15 +1449,22 @@ body {
   overflow: hidden;
 }
 .size-bar > div { height: 100%; background: var(--primary); border-radius: 3px; }
-/* 右侧列固定宽度,让占比条纵向对齐 */
+/* 右侧列固定宽度,让占比条纵向对齐;大小列与条形稍宽松,与文件数列稍收紧 */
 .size-bytes {
   flex: none;
-  width: 76px;
+  width: 64px;
+  margin-left: 6px;
   text-align: left;
   font-variant-numeric: tabular-nums;
   color: var(--text-1);
 }
-.size-count { flex: none; width: 76px; color: var(--text-2); font-size: 12.5px; }
+.size-count {
+  flex: none;
+  width: 76px;
+  margin-left: -6px;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
 .size-enter { flex: none; width: 44px; text-align: center; white-space: nowrap; }
 
 /* 大小分析面包屑导航 */

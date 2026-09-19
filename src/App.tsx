@@ -166,7 +166,7 @@ export default function App() {
             {showSettings ? "应用偏好设置" : active.desc}
           </p>
         </header>
-        <div className="main-body">
+        <div className={"main-body" + (showSettings ? "" : " main-body-tool")}>
           {showSettings ? (
             <Settings />
           ) : (

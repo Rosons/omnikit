@@ -1493,6 +1493,12 @@ pub async fn log_tail_stop(state: tauri::State<'_, TailState>) -> Result<(), Str
     }
     Ok(())
 }
+/// 检查文件或目录是否存在,供覆盖确认等场景使用
+#[tauri::command]
+pub fn path_exists(path: String) -> Result<bool, String> {
+    Ok(Path::new(&path).exists())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

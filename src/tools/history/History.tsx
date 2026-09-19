@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { fmtBytes, fmtTime } from "../../lib/format";
 import { requestDecrypt } from "../../lib/bus";
 import { showToast } from "../../components/Toast";
+import { showConfirm } from "../../components/ConfirmDialog";
 
 interface HistoryEntry {
   id: number;
@@ -17,7 +18,6 @@ interface HistoryEntry {
 
 export default function History() {
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
-  const [confirmingClear, setConfirmingClear] = useState(false);
 
   useEffect(() => {
     invoke<HistoryEntry[]>("sb_history_list")
@@ -26,6 +26,16 @@ export default function History() {
   }, []);
 
   async function remove(id: number) {
+    const entry = entries?.find((e) => e.id === id);
+    const ok = await showConfirm({
+      title: "删除记录",
+      message: entry
+        ? `确定删除这条记录吗？\n${entry.name}`
+        : "确定删除这条记录吗？",
+      confirmLabel: "删除",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await invoke("sb_history_remove", { id });
       setEntries((es) => es?.filter((e) => e.id !== id) ?? null);
@@ -35,10 +45,16 @@ export default function History() {
   }
 
   async function clearAll() {
+    const ok = await showConfirm({
+      title: "清空记录",
+      message: `确定清空全部 ${count} 条记录吗？`,
+      confirmLabel: "清空",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await invoke("sb_history_clear");
       setEntries([]);
-      setConfirmingClear(false);
     } catch (e) {
       showToast(String(e), "error");
     }
@@ -59,15 +75,9 @@ export default function History() {
           共 {count} 条记录 · 仅保存在本机{count > 0 && "，删除记录不影响文件本身"}
         </span>
         <div className="toolbar-right">
-          {count > 0 &&
-            (confirmingClear ? (
-              <>
-                <button className="btn-text" onClick={clearAll}>确认清空</button>
-                <button className="btn-text" onClick={() => setConfirmingClear(false)}>取消</button>
-              </>
-            ) : (
-              <button className="btn-text" onClick={() => setConfirmingClear(true)}>清空记录</button>
-            ))}
+          {count > 0 && (
+            <button className="btn-text" onClick={clearAll}>清空记录</button>
+          )}
         </div>
       </div>
 

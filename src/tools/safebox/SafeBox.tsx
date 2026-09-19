@@ -6,6 +6,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { fmtBytes, fmtDuration } from "../../lib/format";
 import { peekDecryptPrefill } from "../../lib/bus";
 import { showToast } from "../../components/Toast";
+import { showConfirm } from "../../components/ConfirmDialog";
 
 interface ProgressEvent {
   phase: "pack" | "unpack";
@@ -290,6 +291,15 @@ export default function SafeBox() {
   }
 
   async function startEncrypt() {
+    if (await invoke<boolean>("path_exists", { path: output })) {
+      const ok = await showConfirm({
+        title: "覆盖确认",
+        message: `输出位置已有同名文件，继续将覆盖它：${baseName(output)}`,
+        confirmLabel: "覆盖",
+        danger: true,
+      });
+      if (!ok) return;
+    }
     setPhase("busy");
     setProgress(null);
     setSummary(null);

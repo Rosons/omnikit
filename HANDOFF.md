@@ -202,6 +202,8 @@ devtoolbox/
 - **日志查看**(id `logtail`,开发工具组):Rust `log_tail_start/log_tail_stop` + TailState(独立 manage):后台线程每 500ms 增量读(seek 追读),初始加载文件末尾 200KB(丢弃首残行),单批最多 2000 行,文件变小(轮转)发 reset 事件自动重收;事件 `logtail://lines` {reset, lines}
   - 前端:缓冲上限 5000 行;关键字过滤(不区分大小写)+命中高亮(.re-hit 黄底);自动滚动开关(跟底);清屏;监视中/已停止状态 chip
 - 侧边栏现为 **4 组 16 个工具**;新图标 ProcIcon 心电波纹/LogIcon 文档行;教训:python 批量改 registry 时注意数组逗号与 SVG 属性引号(曾产生数组空洞 undefined 与属性缺引号,tsc 拦截)
+- **破坏性操作确认全覆盖**(用户要求):文件管理记录删除/清空改用 showConfirm(替换原两步内联确认);**新增 `path_exists` 命令**,保险箱加密时若输出位置已有同名 .box,先弹红色「覆盖确认」再执行;端口/进程/磁盘删除此前已接 showConfirm
+- **修复进程管理 CPU/内存恒为 0**:sysinfo `ProcessRefreshKind::nothing()` 的 cpu/memory 开关默认关闭,需显式 `.with_memory().with_cpu()`;侧边栏不可滚动:grid 行高需 `grid-template-rows: minmax(0,1fr)` 锁定,否则内容把行撑出视口
 
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)

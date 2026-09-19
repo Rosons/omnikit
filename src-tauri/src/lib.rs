@@ -42,6 +42,7 @@ pub fn run() {
             commands::net_resolve,
             commands::log_tail_start,
             commands::log_tail_stop,
+            commands::path_exists,
             mcp::mcp_connect,
             mcp::mcp_disconnect,
             mcp::mcp_list_tools,

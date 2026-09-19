@@ -256,7 +256,8 @@ body {
 .clip-row .btn-text { flex: none; }
 
 /* ===== 文件搜索 ===== */
-.fsearch-page { height: 100%; min-height: 360px; }
+.main-body:has(.fsearch-page) { display: flex; flex-direction: column; }
+.fsearch-page { height: 100%; min-height: 320px; }
 .fs-input { flex: none; }
 .fs-status {
   flex: none;

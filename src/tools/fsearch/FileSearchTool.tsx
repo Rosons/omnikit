@@ -196,6 +196,13 @@ export default function FileSearchTool() {
 
       <div className="fs-status">
         <span className="hint">{statusText}</span>
+        {results && (
+          <span className="hint">
+            {results.length >= 300
+              ? "命中 300+ 条（仅显示前 300）"
+              : `命中 ${results.length} 条`}
+          </span>
+        )}
         <div style={{ flex: 1 }} />
         {status && status.files > 0 && !status.indexing && !configVisible && (
           <button className="btn-text" onClick={() => setConfigOpen(true)}>

@@ -1661,13 +1661,15 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  line-height: 1;
+  vertical-align: middle;
   cursor: pointer;
   color: var(--primary);
   font-size: 12px;
   list-style: none;
 }
 .mcp-inline summary::-webkit-details-marker { display: none; }
-.mcp-inline summary svg { transition: transform var(--fast); }
+.mcp-inline summary svg { flex: none; transition: transform var(--fast); }
 .mcp-inline[open] summary svg { transform: rotate(180deg); }
 .mcp-inline pre {
   margin: 8px 0 0;

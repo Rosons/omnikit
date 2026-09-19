@@ -29,9 +29,13 @@ export default function FileSearchTool() {
   const rootsTouched = useRef(false);
   const qTimer = useRef<number | undefined>(undefined);
 
+  const fetchSeq = useRef(0);
+
   async function refreshStatus() {
+    const seq = ++fetchSeq.current;
     try {
       const st = await invoke<SearchStatus>("search_status");
+      if (seq !== fetchSeq.current) return; // 乱序响应,丢弃
       setStatus(st);
       // 首次加载:自动勾选上次索引的范围
       if (!rootsTouched.current && st.roots.length > 0 && !st.indexing) {
@@ -129,6 +133,11 @@ export default function FileSearchTool() {
     if (roots.size !== status.roots.length) return true;
     return [...roots].some((r) => !status.roots.includes(r));
   }, [status, roots]);
+
+  // 索引健康:24 小时以上未重建视为过期,提醒用户重建
+  const indexStale =
+    status && !status.indexing && status.files > 0 &&
+    Date.now() / 1000 - status.last_time > 24 * 3600;
 
   const needConfig = !status || status.indexing || status.files === 0 || scopeMismatch;
   const configVisible = needConfig || configOpen;
@@ -231,6 +240,15 @@ export default function FileSearchTool() {
       )}
 
       <div className="fs-status">
+        {status?.indexing ? (
+          <span className="jwt-chip pending">索引中</span>
+        ) : !status || status.files === 0 ? (
+          <span className="jwt-chip expired">未建立索引</span>
+        ) : indexStale ? (
+          <span className="jwt-chip pending">索引已过期 · 建议重建</span>
+        ) : (
+          <span className="jwt-chip valid">索引正常</span>
+        )}
         <span className="hint">{statusText}</span>
         {results && (
           <span className="hint">

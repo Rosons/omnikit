@@ -349,7 +349,7 @@ pub async fn search_start(
     }
     state.indexing.store(true, Ordering::Relaxed);
     state.stop.store(false, Ordering::Relaxed);
-    *state.paths.write().unwrap() = Vec::new();
+    // 不清空现有索引:重建期间旧索引继续可用,扫描完成后整体切换
     let (excludes, exts) = {
         let cfg = settings.0.lock().unwrap();
         (cfg.search_excludes.clone(), cfg.search_exclude_exts.clone())

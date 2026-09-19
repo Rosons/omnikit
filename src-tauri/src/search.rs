@@ -121,6 +121,7 @@ fn index_worker(
     roots: Vec<String>,
     excludes: Vec<String>,
     exclude_exts: Vec<String>,
+    estimate: u64,
 ) {
     let excludes_lc: Vec<String> = excludes.iter().map(|e| e.to_lowercase()).collect();
     let exts_lc: Vec<String> = exclude_exts.iter().map(|e| e.to_lowercase()).collect();
@@ -163,14 +164,7 @@ fn index_worker(
             vec.push(lossy.to_string().into_boxed_str());
             if last_emit.elapsed().as_millis() >= 300 {
                 last_emit = Instant::now();
-                let last_files = app
-                    .state::<SearchState>()
-                    .meta
-                    .lock()
-                    .unwrap()
-                    .as_ref()
-                    .map(|m| m.files)
-                    .unwrap_or(0);
+                let last_files = estimate;
                 let _ = app.emit(
                     "idx://progress",
                     serde_json::json!({
@@ -360,9 +354,11 @@ pub async fn search_start(
         let cfg = settings.0.lock().unwrap();
         (cfg.search_excludes.clone(), cfg.search_exclude_exts.clone())
     };
+    // 估算基准现在就取,避免缓存尚未加载完导致进度条走流动动画
+    let estimate = state.meta.lock().unwrap().as_ref().map(|m| m.files).unwrap_or(0);
     let app2 = app.clone();
     let st = state.inner().clone();
-    std::thread::spawn(move || index_worker(app2, st, roots, excludes, exts));
+    std::thread::spawn(move || index_worker(app2, st, roots, excludes, exts, estimate));
     Ok(())
 }
 

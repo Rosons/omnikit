@@ -136,11 +136,13 @@ export default function FileSearchTool() {
   const statusText = useMemo(() => {
     if (!status) return "";
     const scope = status.roots.length > 0 ? ` · 范围 ${status.roots.join("、")}` : "";
-    if (status.indexing) return `索引中 · ${status.files.toLocaleString()} 个文件`;
+    // 索引中用事件实时计数(status.files 在扫描完成前一直是 0)
+    if (status.indexing)
+      return `索引中 · ${(progress?.files ?? status.files).toLocaleString()} 个文件`;
     if (status.files > 0)
       return `${status.files.toLocaleString()} 个文件${scope} · 建于 ${fmtTime(status.last_time)}`;
     return "尚未建立索引";
-  }, [status]);
+  }, [status, progress]);
 
   return (
     <div className="stack fsearch-page">

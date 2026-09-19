@@ -88,11 +88,16 @@ export default function FileSearchTool() {
     }
     qTimer.current = window.setTimeout(async () => {
       try {
-        setResults(await invoke<string[]>("search_query", { q: query, limit: 300 }));
+        const r = await invoke<{ stale: boolean; lines: string[] }>("search_query", {
+          q: query,
+          limit: 300,
+        });
+        // stale 表示期间有更新的输入,后端仍在算,此时不动旧结果避免闪烁
+        if (!r.stale) setResults(r.lines);
       } catch (e) {
         showToast(String(e), "error", 5000);
       }
-    }, 200);
+    }, 350);
     return () => window.clearTimeout(qTimer.current);
   }, [query]);
 

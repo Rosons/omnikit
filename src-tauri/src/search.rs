@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use notify::Watcher;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -28,6 +28,10 @@ pub struct SearchState {
     pub meta: Arc<Mutex<Option<IndexMeta>>>,
     pub watched: Arc<Mutex<Vec<String>>>,
     pub watcher: Arc<Mutex<Option<notify::RecommendedWatcher>>>,
+    /// 查询代数:后台扫描完成时丢弃过期结果,前端拿到的永远是最新的
+    pub query_seq: Arc<AtomicU64>,
+    pub query_done: Arc<AtomicU64>,
+    pub query_result: Arc<Mutex<Option<(u64, Vec<String>)>>>,
 }
 
 impl Default for SearchState {
@@ -40,6 +44,9 @@ impl Default for SearchState {
             meta: Arc::new(Mutex::new(None)),
             watched: Arc::new(Mutex::new(Vec::new())),
             watcher: Arc::new(Mutex::new(None)),
+            query_seq: Arc::new(AtomicU64::new(0)),
+            query_done: Arc::new(AtomicU64::new(0)),
+            query_result: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -448,26 +455,11 @@ fn token_match(token: &str, path_lc: &str) -> bool {
     }
 }
 
-#[tauri::command]
-pub fn search_query(
-    state: tauri::State<'_, SearchState>,
-    q: String,
-    limit: Option<usize>,
-) -> Vec<String> {
-    let tokens: Vec<String> = q
-        .trim()
-        .split_whitespace()
-        .map(|t| t.to_lowercase())
-        .collect();
-    if tokens.is_empty() {
-        return Vec::new();
-    }
-    let limit = limit.unwrap_or(300);
-    let paths = state.paths.read().unwrap();
+fn scan_once(paths: &[Box<str>], tokens: &[String], limit: usize) -> Vec<String> {
     let mut out: Vec<String> = Vec::with_capacity(64);
-    'outer: for p in paths.iter() {
+    'outer: for p in paths {
         let pl = p.to_lowercase();
-        for t in &tokens {
+        for t in tokens {
             if !token_match(t, &pl) {
                 continue 'outer;
             }
@@ -478,4 +470,50 @@ pub fn search_query(
         }
     }
     out
+}
+
+/// 异步搜索:同一时刻只保留最新查询,后台扫描完成后回填,避免请求堆积卡 UI
+#[tauri::command]
+pub async fn search_query(
+    state: tauri::State<'_, SearchState>,
+    q: String,
+    limit: Option<usize>,
+) -> Result<QueryReply, String> {
+    let tokens: Vec<String> = q
+        .trim()
+        .split_whitespace()
+        .map(|t| t.to_lowercase())
+        .collect();
+    if tokens.is_empty() {
+        return Ok(QueryReply { stale: false, lines: Vec::new() });
+    }
+    let limit = limit.unwrap_or(300);
+    let seq = state.query_seq.fetch_add(1, Ordering::Relaxed) + 1;
+    let st = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let paths = st.paths.read().unwrap().clone();
+        let lines = scan_once(&paths, &tokens, limit);
+        *st.query_result.lock().unwrap() = Some((seq, lines));
+        st.query_done.store(seq, Ordering::Relaxed);
+    });
+    // 轮询等待:结果代数落后于最新请求时返回 stale,前端不渲染旧结果
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        if Instant::now() > deadline {
+            return Ok(QueryReply { stale: true, lines: Vec::new() });
+        }
+        let latest = state.query_seq.load(Ordering::Relaxed);
+        if let Some((done, lines)) = state.query_result.lock().unwrap().clone() {
+            if done >= latest {
+                return Ok(QueryReply { stale: false, lines });
+            }
+        }
+    }
+}
+
+#[derive(serde::Serialize)]
+pub struct QueryReply {
+    pub stale: bool,
+    pub lines: Vec<String>,
 }

@@ -230,6 +230,7 @@ devtoolbox/
   - **实时更新**:**notify 6** 递归监听各索引根,Create/Remove/Rename(From/To/Both)按小写序二分插入/删除(目录删除按前缀连续区间 drain);watcher 存在 SearchState,重建索引自动重启监听;路径写入前过排除规则;与 Everything 的 USN 方案不同但效果接近
   - **搜索**:空格分隔多关键字 AND;`*` `?` 通配符(手写 glob 递归匹配,不引 regex 库);仍为子串扫描,百万级约 0.2-0.4s/次
   - **UI 精简**:只剩搜索框 + 结果列表 + 底部一行状态;磁盘勾选/索引按钮只在「无索引/索引中/范围不一致/手动点重建」时出现,平时藏起,状态栏有「重建索引」入口
+  - **查询防抖**(用户反馈输入卡顿):后端 search_query 改**队列化异步**——每次请求分配递增代数(query_seq),spawn_blocking 扫描,完成回填 query_result;等待循环里若结果代数落后最新请求则返回 stale,前端防抖 350ms、stale 时保持旧结果不闪烁;避免快速输入时扫描请求堆积互相阻塞
 - 设置页开关用 `Switch` 组件(`src/components/Switch.tsx`),下拉用 `Dropdown` 组件(`src/components/Dropdown.tsx`,菜单 fixed 定位防 kv-list overflow 裁剪,菜单内滚动不关闭、页面滚动才收起、贴底自动上弹)
 
 ### 剩余手动验收(需真人操作)

@@ -214,6 +214,8 @@ devtoolbox/
   - 启动页:localStorage(`devtoolbox.startPage`=last 或工具 id;`devtoolbox.lastPage` 每次切换记录),App.tsx 初始化时读取
 - **数据工具箱扩到 11 个子 Tab**(新增 URL/批处理/进制/Base64;组件在 `src/tools/devtools/more.tsx` 独立模块,DevTools.tsx 引入):URL 解析(new URL+searchParams 自动解码,组成部分与查询参数逐项复制)、文本批处理(去重/排序/反转/去空行/Trim/大小写/全角转半角,点按即生效+20 步撤销)、进制换算(BigInt,2/8/10/16 互转,合法字符校验)、文件转 Base64(Rust `read_file_base64` 上限 16MB,输出纯 Base64 与 data URI,按扩展名映射 MIME)
 - `.seg` 加 flex-wrap(11 个子 Tab 需换行);**教训:长内容严禁 bash heredoc 直写文件(两次被截断损坏,改用 Write 工具或脚本文件)**
+- **新功能必须有用途说明**(用户要求):四个新子页(URL/批处理/进制/Base64)标题下补了 `.hint` 用途一句话;数据工具箱 desc 更新为列全部子项;**今后新增工具/子页,输入区上方或下方必须有一句「这是干啥的」**
+- 设置页开关用 `Switch` 组件(`src/components/Switch.tsx`),下拉用 `Dropdown` 组件(`src/components/Dropdown.tsx`,菜单 fixed 定位防 kv-list overflow 裁剪,菜单内滚动不关闭、页面滚动才收起、贴底自动上弹)
 
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)

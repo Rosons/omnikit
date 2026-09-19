@@ -35,6 +35,7 @@ export function UrlTool() {
     <div className="stack">
       <div className="field">
         <span className="field-label">URL</span>
+        <span className="hint">把一条链接拆成协议、主机、端口、路径、查询参数等部分，参数值自动解码</span>
         <input
           className={`input input-mono${parsed?.err ? " input-error" : ""}`}
           value={input}
@@ -159,6 +160,7 @@ export function TextBatchTool() {
     <div className="stack">
       <div className="field">
         <span className="field-label">文本（每行一条，点操作按钮立即生效，可撤销）</span>
+        <span className="hint">按行批量整理文本，适合清洗名单、日志、导入数据前的准备</span>
         <textarea
           className="textarea input-mono"
           style={{ height: 260 }}
@@ -229,6 +231,7 @@ export function RadixTool() {
     <div className="stack">
       <div className="field">
         <span className="field-label">输入（非负整数，选当前进制）</span>
+        <span className="hint">二、八、十、十六进制之间互转，输入后自动出结果</span>
         <input
           className={`input input-mono${t && !valid ? " input-error" : ""}`}
           value={input}
@@ -331,6 +334,7 @@ export function FileB64Tool() {
         </button>
       </div>
       {busy && <div className="hint">转换中…</div>}
+        <span className="hint">把文件编码成 Base64 文本或 data URI，可直接内嵌到网页或接口参数里</span>
       {res && (
         <>
           <div className="tool-actions">

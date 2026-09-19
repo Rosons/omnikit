@@ -44,7 +44,7 @@ export const tools: ToolModule[] = [
     id: "devtools",
     group: "dev" as ToolGroup,
     name: "数据工具箱",
-    desc: "JSON / 时间戳 / 编解码 / UUID / 哈希 / JWT / SQL",
+    desc: "JSON、编解码、哈希、JWT、SQL、URL 解析、批处理、进制、Base64 等 11 项小功能",
     icon: WrenchIcon,
     component: lazy(() => import("./devtools/DevTools")),
   },

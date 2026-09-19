@@ -213,7 +213,7 @@ export default function Settings() {
               OmniKit
             </span>
             <span className="hint">
-              v0.8.0 · 个人百宝工具箱 · 全部功能本地处理，数据不出设备
+              v0.8.0 · 百宝工具箱 · 全部功能本地处理，数据不出设备
             </span>
           </div>
         </div>

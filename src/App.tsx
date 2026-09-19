@@ -94,7 +94,7 @@ export default function App() {
           </div>
           <div>
             <div className="brand-name">OmniKit</div>
-            <div className="brand-sub">个人百宝工具箱</div>
+            <div className="brand-sub">百宝工具箱</div>
           </div>
         </div>
 

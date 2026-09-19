@@ -92,7 +92,7 @@ body {
   width: 34px;
   height: 34px;
   border-radius: 9px;
-  background: var(--primary-dim);
+  background: linear-gradient(180deg, #3fbcff, #069ef2);
   display: grid;
   place-items: center;
   flex: none;

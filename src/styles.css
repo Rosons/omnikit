@@ -1389,6 +1389,28 @@ body {
 .pw-strength.s-low { color: var(--danger); }
 
 /* ===== HTTP 测试 ===== */
+/* 页面自身占满内容区高度:头部区块固定,响应体占满剩余空间内部滚动 */
+.http-page {
+  height: 100%;
+  min-height: 320px;
+}
+.http-page .main-body-scroll { overflow: visible; }
+.http-flex-none { flex: none; }
+.http-flex {
+  flex: 1;
+  min-height: 0;
+}
+.http-body { flex: 3; }
+.http-body .textarea,
+.http-body-out {
+  height: 100%;
+  resize: none;
+}
+.http-body-input { height: 72px; }
+.http-h-clip {
+  max-height: 140px;
+  overflow-y: auto;
+}
 .http-row { display: flex; align-items: center; gap: 10px; }
 .http-row .seg { margin-bottom: 0; flex: none; }
 .http-method { padding: 2px; }

@@ -69,8 +69,8 @@ export default function HttpTool() {
         : " c-err";
 
   return (
-    <div className="stack">
-      <div className="field">
+    <div className="stack http-page">
+      <div className="field http-flex-none">
         <div className="http-row">
           <div className="seg seg-sm http-method" role="tablist">
             {METHODS.map((m) => (
@@ -99,7 +99,7 @@ export default function HttpTool() {
         </div>
       </div>
 
-      <div className="field">
+      <div className="field http-flex-none">
         <span className="field-label">
           请求头
           <button className="btn-text" onClick={() => setRows((s) => [...s, { k: "", v: "" }])}>
@@ -134,11 +134,10 @@ export default function HttpTool() {
         ))}
       </div>
 
-      <div className="field">
+      <div className="field http-flex-none">
         <span className="field-label">请求体（GET 忽略；Content-Type 用请求头自行指定）</span>
         <textarea
-          className="textarea input-mono"
-          style={{ height: 96 }}
+          className="textarea http-body-input"
           value={body}
           onChange={(e) => setBody(e.target.value)}
           spellCheck={false}
@@ -147,14 +146,14 @@ export default function HttpTool() {
 
       {res && (
         <>
-          <div className="tool-actions">
+          <div className="tool-actions http-flex-none">
             <span className={`jwt-chip http-status${statusClass}`}>状态 {res.status}</span>
             <span className="hint">耗时 {res.time_ms} ms</span>
             <span className="hint">大小 {fmtBytes(res.size)}</span>
           </div>
-          <div className="field">
+          <div className="field http-flex-none">
             <span className="field-label">响应头</span>
-            <div className="kv-list">
+            <div className="kv-list http-h-clip">
               {res.headers.map(([k, v]) => (
                 <div className="kv-row" key={k}>
                   <span className="kv-k" style={{ minWidth: 140 }}>
@@ -165,15 +164,14 @@ export default function HttpTool() {
               ))}
             </div>
           </div>
-          <div className="field">
+          <div className="field http-flex http-body">
             <span className="field-label">
               响应体
               {isJson && <span className="hint">已自动格式化 JSON</span>}
               <CopyButton text={res.body} />
             </span>
             <textarea
-              className="textarea input-mono"
-              style={{ height: 240 }}
+              className="textarea http-body-out"
               value={prettyBody}
               readOnly
               spellCheck={false}

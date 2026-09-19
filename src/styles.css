@@ -268,6 +268,15 @@ body {
   max-height: calc(100vh - 280px);
   min-height: 160px;
   overflow-y: auto;
+  /* 覆盖 .kv-list 的 overflow:hidden,滚动容器内边距贴边 */
+  overscroll-behavior: contain;
+}
+.fs-list.kv-list { overflow-y: auto; }
+.fs-list.kv-list::-webkit-scrollbar { width: 10px; }
+.fs-list.kv-list::-webkit-scrollbar-thumb {
+  background: #c3cad6;
+  border-radius: 5px;
+  border: 2px solid var(--card);
 }
 .btn-text { white-space: nowrap; }
 .fs-path {

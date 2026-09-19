@@ -269,6 +269,7 @@ body {
   min-height: 160px;
   overflow-y: auto;
 }
+.btn-text { white-space: nowrap; }
 .fs-path {
   overflow: hidden;
   text-overflow: ellipsis;

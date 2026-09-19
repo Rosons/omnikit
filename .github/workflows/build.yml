@@ -19,8 +19,11 @@ jobs:
         run: npm ci
       - name: Build (NSIS)
         env:
-          CARGO_TARGET_DIR: ./target
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
         run: npx tauri build --bundles nsis
+      - name: Locate bundle files
+        shell: bash
+        run: find target src-tauri/target -type d -name bundle 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         with:
           name: OmniKit-windows
@@ -40,11 +43,15 @@ jobs:
         run: npm ci
       - name: Build (app + dmg)
         env:
-          CARGO_TARGET_DIR: ./target
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
         run: npx tauri build --bundles app,dmg
+      - name: Locate bundle files
+        shell: bash
+        run: find target src-tauri/target -type d -name bundle 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         with:
           name: OmniKit-macos
           path: |
             target/release/bundle/dmg/*.dmg
+            target/release/bundle/macos/*.app
           if-no-files-found: error

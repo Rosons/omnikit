@@ -1450,6 +1450,39 @@ body {
 }
 .size-bar > div { height: 100%; background: var(--primary); border-radius: 3px; }
 
+/* 大小分析面包屑导航 */
+.crumb-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  background: var(--fill);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  font-size: 12.5px;
+}
+.crumb-bar .btn-text { flex: none; }
+.crumb-path {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.crumb-item {
+  color: var(--text-2);
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 4px;
+  flex: none;
+}
+.crumb-item:hover { color: var(--primary); background: var(--primary-dim); }
+.crumb-item.cur { color: var(--text-1); font-weight: 600; cursor: default; }
+.crumb-item.cur:hover { background: none; }
+.crumb-sep { color: var(--text-3); flex: none; }
+
 /* 紧凑控件(密码生成/Cron 生成器的数字输入与小按钮) */
 .input-sm { height: 28px; }
 .btn-sm { height: 28px; padding: 0 16px; font-size: 12.5px; }

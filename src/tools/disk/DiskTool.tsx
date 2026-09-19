@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent } from "react";
+import { Fragment, useEffect, useState, type MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -307,6 +307,20 @@ function SizeView() {
 
   const maxBytes = report && report.items.length > 0 ? report.items[0].bytes : 1;
 
+  // 面包屑:把当前路径拆成可点击的层级
+  const crumbs = (() => {
+    const parts = dir.trim().replace(/\//g, "\\").split("\\").filter(Boolean);
+    const out: { name: string; path: string }[] = [];
+    let acc = "";
+    for (let i = 0; i < parts.length; i++) {
+      if (i === 0) acc = parts[0].endsWith(":") ? parts[0] + "\\" : parts[0];
+      else acc = acc.endsWith("\\") ? acc + parts[i] : acc + "\\" + parts[i];
+      out.push({ name: i === 0 && parts[0].endsWith(":") ? parts[0] + "\\" : parts[i], path: acc });
+    }
+    return out;
+  })();
+  const parentPath = crumbs.length > 1 ? crumbs[crumbs.length - 2].path : null;
+
   return (
     <div className="stack">
       <div className="tool-actions">
@@ -350,6 +364,24 @@ function SizeView() {
       )}
       {report && (
         <>
+          <div className="crumb-bar">
+            <button className="btn-text" onClick={() => parentPath && scan(parentPath)} disabled={!parentPath}>
+              ↑ 上一级
+            </button>
+            <div className="crumb-path">
+              {crumbs.map((c, i) => (
+                <Fragment key={c.path}>
+                  {i > 0 && <span className="crumb-sep">›</span>}
+                  <span
+                    className={`crumb-item${i === crumbs.length - 1 ? " cur" : ""}`}
+                    onClick={() => i < crumbs.length - 1 && scan(c.path)}
+                  >
+                    {c.name}
+                  </span>
+                </Fragment>
+              ))}
+            </div>
+          </div>
           <div className="hint hint-ok">
             共 {report.total_files} 个文件 · 总计 {fmtBytes(report.total_bytes)}
           </div>

@@ -66,6 +66,7 @@ body {
 .app {
   display: grid;
   grid-template-columns: 216px 1fr;
+  grid-template-rows: minmax(0, 1fr);
   height: 100%;
 }
 
@@ -73,6 +74,8 @@ body {
 .sidebar {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
   padding: var(--sp-4) var(--sp-3);
   background: var(--card);
   border-right: 1px solid var(--border);

@@ -89,6 +89,14 @@ export const tools: ToolModule[] = [
     component: lazy(() => import("./mcp/McpTool")),
   },
   {
+    id: "logtail",
+    group: "dev" as ToolGroup,
+    name: "日志查看",
+    desc: "实时跟踪日志文件与关键字过滤",
+    icon: LogIcon,
+    component: lazy(() => import("./logtail/LogTailTool")),
+  },
+  {
     id: "regex",
     group: "dev" as ToolGroup,
     name: "正则测试",
@@ -135,6 +143,14 @@ export const tools: ToolModule[] = [
     desc: "CPU、内存与磁盘实时状态",
     icon: GaugeIcon,
     component: lazy(() => import("./monitor/MonitorTool")),
+  },
+  {
+    id: "proc",
+    group: "system" as ToolGroup,
+    name: "进程管理",
+    desc: "全部进程、资源占用与结束",
+    icon: ProcIcon,
+    component: lazy(() => import("./proc/ProcTool")),
   },
 ];
 
@@ -332,6 +348,36 @@ function PlugIcon({ size = 16 }: { size?: number }) {
       <rect x="13" y="2.5" width="2.4" height="6" rx="1.2" fill="#9fcdfb" />
       <path d="M7 7.5h10v4a5 5 0 0 1-5 5 5 5 0 0 1-5-5z" fill="#06a7ff" />
       <rect x="10.8" y="14" width="2.4" height="7.5" rx="1.2" fill="#06a7ff" />
+    </svg>
+  );
+}
+
+function ProcIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" fill="#9fcdfb" />
+      <path
+        d="M5 12.5h3.2L10 8l3.4 8 2-3.5H19"
+        stroke="#06a7ff"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+function LogIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M6 2.5h9l4 4V21.5H6z" fill="#9fcdfb" />
+      <path d="M15 2.5l4 4h-4z" fill="#06a7ff" />
+      <g stroke="#06a7ff" strokeWidth="1.7" strokeLinecap="round">
+        <path d="M9 10h7" />
+        <path d="M9 13.5h7" />
+        <path d="M9 17h4.5" />
+      </g>
     </svg>
   );
 }

@@ -15,7 +15,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(commands::AppState::default())
-        .manage(McpState::default())
+        .manage(mcp::McpState::default())
+        .manage(commands::TailState::default())
         .invoke_handler(tauri::generate_handler![
             commands::sb_encrypt,
             commands::sb_decrypt,
@@ -37,6 +38,10 @@ pub fn run() {
             commands::disk_dir_sizes,
             commands::disk_trash,
             commands::sys_overview,
+            commands::proc_list,
+            commands::net_resolve,
+            commands::log_tail_start,
+            commands::log_tail_stop,
             mcp::mcp_connect,
             mcp::mcp_disconnect,
             mcp::mcp_list_tools,

@@ -1710,6 +1710,65 @@ details.mcp-log pre {
   overflow-wrap: anywhere;
 }
 
+/* ===== 进程管理 ===== */
+.proc-list { max-height: calc(100vh - 330px); min-height: 220px; }
+.proc-head.proc-head,
+.proc-row.proc-row {
+  grid-template-columns: 160px minmax(0, 1fr) 70px 64px 88px 110px;
+}
+.proc-name {
+  color: var(--text-1);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.proc-path {
+  color: var(--text-3);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.proc-cpu {
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+.proc-cpu.hot { color: var(--danger); font-weight: 600; }
+.proc-mem {
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== 日志查看 ===== */
+.logtail-page { height: 100%; min-height: 320px; }
+.log-view {
+  flex: 1;
+  min-height: 200px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  padding: 8px 12px;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text-1);
+}
+.log-view mark.re-hit {
+  background: #fff1a8;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.log-empty {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 12.5px;
+  font-family: inherit;
+}
+
 /* 紧凑控件(密码生成/Cron 生成器的数字输入与小按钮) */
 .input-sm { height: 28px; }
 .btn-sm { height: 28px; padding: 0 16px; font-size: 12.5px; }

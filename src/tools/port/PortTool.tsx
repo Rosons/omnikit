@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { showConfirm } from "../../components/ConfirmDialog";
 import { showToast } from "../../components/Toast";
+import CopyButton from "../../components/CopyButton";
 import { fmtBytes, fmtTime } from "../../lib/format";
 
 interface PortRow {
@@ -17,7 +18,7 @@ interface PortRow {
 }
 
 export default function PortTool() {
-  const [tab, setTab] = useState<"listen" | "probe">("listen");
+  const [tab, setTab] = useState<"listen" | "probe" | "resolve">("listen");
   return (
     <div className="stack port-page">
       <div className="seg seg-sm" role="tablist">
@@ -33,8 +34,79 @@ export default function PortTool() {
         >
           连通测试
         </button>
+        <button
+          className={`seg-btn${tab === "resolve" ? " active" : ""}`}
+          onClick={() => setTab("resolve")}
+        >
+          域名解析
+        </button>
       </div>
-      {tab === "listen" ? <ListenView /> : <ProbeView />}
+      {tab === "listen" ? <ListenView /> : tab === "probe" ? <ProbeView /> : <ResolveView />}
+    </div>
+  );
+}
+
+interface ResolveEntry {
+  ip: string;
+  version: string;
+}
+
+function ResolveView() {
+  const [host, setHost] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [list, setList] = useState<ResolveEntry[] | null>(null);
+
+  async function resolve() {
+    if (!host.trim()) {
+      showToast("请输入域名或主机名", "error", 3000);
+      return;
+    }
+    setBusy(true);
+    try {
+      setList(await invoke<ResolveEntry[]>("net_resolve", { host: host.trim() }));
+    } catch (e) {
+      showToast(String(e), "error", 5000);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="stack">
+      <div className="field">
+        <span className="field-label">域名或主机名（自动去掉协议前缀与端口）</span>
+        <div className="probe-row">
+          <input
+            className="input input-sm input-mono"
+            style={{ flex: 1 }}
+            value={host}
+            onChange={(e) => setHost(e.target.value)}
+            placeholder="如 example.com 或 db.internal.local"
+            spellCheck={false}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") resolve();
+            }}
+          />
+          <button className="btn btn-primary btn-sm" onClick={resolve} disabled={busy}>
+            {busy ? "解析中…" : "解析"}
+          </button>
+        </div>
+      </div>
+      {list && (
+        <div className="field">
+          <span className="field-label">解析结果（{list.length} 个地址）</span>
+          <div className="kv-list">
+            {list.map((r, i) => (
+              <div className="kv-row" key={`${r.ip}-${i}`}>
+                <span className="kv-v kv-mono">{r.ip}</span>
+                <span className="jwt-chip valid">{r.version}</span>
+                <CopyButton text={r.ip} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="hint">使用系统 DNS 解析；域名配有多条记录时会全部列出，hosts 文件的条目也会生效</div>
     </div>
   );
 }

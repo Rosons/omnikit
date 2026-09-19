@@ -8,7 +8,7 @@ use sha1::Sha1;
 use sha2::{Sha256, Sha512};
 use std::cell::Cell;
 use std::fs;
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 #[cfg(windows)]
@@ -1303,6 +1303,192 @@ pub async fn sys_overview() -> Result<SysOverview, String> {
     .map_err(|e| format!("任务执行失败：{e}"))?
 }
 
+
+/* ---------- 进程管理 ---------- */
+
+#[derive(Serialize, Clone)]
+pub struct ProcEntry {
+    pub pid: u32,
+    pub name: String,
+    pub path: Option<String>,
+    pub cpu: f32,
+    pub mem: u64,
+    pub start: u64,
+}
+
+#[tauri::command]
+pub async fn proc_list() -> Result<Vec<ProcEntry>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+        let mut sys = System::new();
+        let kind = ProcessRefreshKind::nothing().with_exe(UpdateKind::Always);
+        sys.refresh_processes_specifics(ProcessesToUpdate::All, true, kind);
+        std::thread::sleep(Duration::from_millis(300));
+        sys.refresh_processes_specifics(ProcessesToUpdate::All, true, kind);
+        let mut out: Vec<ProcEntry> = sys
+            .processes()
+            .iter()
+            .map(|(pid, p)| ProcEntry {
+                pid: pid.as_u32(),
+                name: p.name().to_string_lossy().into_owned(),
+                path: p.exe().map(|e| e.to_string_lossy().into_owned()),
+                cpu: (p.cpu_usage() * 10.0).round() / 10.0,
+                mem: p.memory(),
+                start: p.start_time(),
+            })
+            .collect();
+        out.sort_by(|a, b| b.mem.cmp(&a.mem).then(a.pid.cmp(&b.pid)));
+        Ok(out)
+    })
+    .await
+    .map_err(|e| format!("任务执行失败：{e}"))?
+}
+
+/* ---------- 域名解析 ---------- */
+
+#[derive(Serialize, Clone)]
+pub struct ResolveEntry {
+    pub ip: String,
+    pub version: String,
+}
+
+#[tauri::command]
+pub async fn net_resolve(host: String) -> Result<Vec<ResolveEntry>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use std::net::ToSocketAddrs;
+        let mut host = host.trim().to_string();
+        for scheme in ["https://", "http://"] {
+            if let Some(rest) = host.strip_prefix(scheme) {
+                host = rest.to_string();
+                break;
+            }
+        }
+        host = host.split('/').next().unwrap_or("").to_string();
+        if !host.contains(']') {
+            if let Some(i) = host.rfind(':') {
+                let tail = &host[i + 1..];
+                if !tail.is_empty() && tail.bytes().all(|c| c.is_ascii_digit()) {
+                    host.truncate(i);
+                }
+            }
+        }
+        if host.is_empty() {
+            return Err("请输入域名或主机名".into());
+        }
+        let list: Vec<ResolveEntry> = (host.as_str(), 0)
+            .to_socket_addrs()
+            .map_err(|e| format!("解析失败：{e}"))?
+            .map(|a| ResolveEntry {
+                ip: a.ip().to_string(),
+                version: if a.is_ipv4() { "IPv4" } else { "IPv6" }.into(),
+            })
+            .collect();
+        let mut seen = std::collections::HashSet::new();
+        let out: Vec<ResolveEntry> = list
+            .into_iter()
+            .filter(|e| seen.insert(e.ip.clone()))
+            .collect();
+        if out.is_empty() {
+            return Err("没有解析到任何地址".into());
+        }
+        Ok(out)
+    })
+    .await
+    .map_err(|e| format!("任务执行失败：{e}"))?
+}
+
+/* ---------- 实时日志 ---------- */
+
+pub struct TailHandle {
+    pub stop: Arc<AtomicBool>,
+}
+
+#[derive(Default)]
+pub struct TailState(pub Mutex<Option<TailHandle>>);
+
+fn watch_log(path: PathBuf, app: AppHandle, stop: Arc<AtomicBool>) {
+    let mut pos: u64 = match fs::metadata(&path) {
+        Ok(md) => md.len().saturating_sub(200 * 1024),
+        Err(_) => 0,
+    };
+    let mut carry = String::new();
+    let mut first = true;
+    loop {
+        if stop.load(Ordering::Relaxed) {
+            break;
+        }
+        if let Ok(md) = fs::metadata(&path) {
+            if md.len() < pos {
+                // 文件被轮转或清空:通知前端重置后从头读
+                pos = 0;
+                carry.clear();
+                let _ = app.emit("logtail://lines", serde_json::json!({ "reset": true, "lines": [] }));
+            }
+        }
+        if let Ok(mut f) = fs::File::open(&path) {
+            if f.seek(SeekFrom::Start(pos)).is_ok() {
+                let mut chunk = Vec::new();
+                if f.read_to_end(&mut chunk).is_ok() && !chunk.is_empty() {
+                    pos += chunk.len() as u64;
+                    carry.push_str(&String::from_utf8_lossy(&chunk));
+                    if first {
+                        // 起始位置在行中间,丢弃残行
+                        if let Some(i) = carry.find('\n') {
+                            carry.drain(..=i);
+                        }
+                        first = false;
+                    }
+                    let mut lines: Vec<String> = Vec::new();
+                    while let Some(i) = carry.find('\n') {
+                        lines.push(carry[..i].trim_end_matches('\r').to_string());
+                        carry.drain(..=i);
+                    }
+                    if lines.len() > 2000 {
+                        let n = lines.len();
+                        lines = lines.split_off(n - 2000);
+                    }
+                    if !lines.is_empty() {
+                        let _ = app.emit(
+                            "logtail://lines",
+                            serde_json::json!({ "reset": false, "lines": lines }),
+                        );
+                    }
+                }
+            }
+        }
+        std::thread::sleep(Duration::from_millis(500));
+    }
+}
+
+#[tauri::command]
+pub async fn log_tail_start(
+    app: AppHandle,
+    state: tauri::State<'_, TailState>,
+    path: String,
+) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if !p.is_file() {
+        return Err("文件不存在".into());
+    }
+    let stop = Arc::new(AtomicBool::new(false));
+    {
+        let mut g = state.0.lock().unwrap();
+        if let Some(h) = g.replace(TailHandle { stop: stop.clone() }) {
+            h.stop.store(true, Ordering::Relaxed);
+        }
+    }
+    let app2 = app.clone();
+    tauri::async_runtime::spawn_blocking(move || watch_log(p, app2, stop));
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn log_tail_stop(state: tauri::State<'_, TailState>) -> Result<(), String> {
+    if let Some(h) = state.0.lock().unwrap().take() {
+        h.stop.store(true, Ordering::Relaxed);
+    }
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;

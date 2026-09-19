@@ -21,6 +21,34 @@ pub struct AppSettings {
     pub remember_window: bool,
     pub hotkey_enabled: bool,
     pub window: Option<WindowGeom>,
+    #[serde(default = "default_search_excludes")]
+    pub search_excludes: Vec<String>,
+    #[serde(default = "default_search_exclude_exts")]
+    pub search_exclude_exts: Vec<String>,
+}
+
+pub fn default_search_excludes() -> Vec<String> {
+    [
+        "node_modules",
+        ".git",
+        ".venv",
+        "__pycache__",
+        "$recycle.bin",
+        "system volume information",
+        "pagefile.sys",
+        "hiberfil.sys",
+        "swapfile.sys",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect()
+}
+
+pub fn default_search_exclude_exts() -> Vec<String> {
+    ["tmp", "temp", "lnk"]
+        .into_iter()
+        .map(String::from)
+        .collect()
 }
 
 impl Default for AppSettings {
@@ -30,6 +58,8 @@ impl Default for AppSettings {
             remember_window: true,
             hotkey_enabled: true,
             window: None,
+            search_excludes: default_search_excludes(),
+            search_exclude_exts: default_search_exclude_exts(),
         }
     }
 }
@@ -75,6 +105,8 @@ pub fn settings_set(
     close_to_tray: Option<bool>,
     remember_window: Option<bool>,
     hotkey_enabled: Option<bool>,
+    search_excludes: Option<Vec<String>>,
+    search_exclude_exts: Option<Vec<String>>,
 ) -> Result<(), String> {
     let mut s = state.0.lock().unwrap().clone();
     if let Some(v) = close_to_tray {
@@ -91,6 +123,12 @@ pub fn settings_set(
             use tauri_plugin_global_shortcut::GlobalShortcutExt;
             let _ = app.global_shortcut().unregister("Alt+Q");
         }
+    }
+    if let Some(v) = search_excludes {
+        s.search_excludes = v;
+    }
+    if let Some(v) = search_exclude_exts {
+        s.search_exclude_exts = v;
     }
     save(&app, &s);
     *state.0.lock().unwrap() = s;

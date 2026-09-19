@@ -10,6 +10,8 @@ interface AppSettings {
   close_to_tray: boolean;
   remember_window: boolean;
   hotkey_enabled: boolean;
+  search_excludes: string[];
+  search_exclude_exts: string[];
 }
 
 const START_PAGE_KEY = "devtoolbox.startPage";
@@ -19,6 +21,8 @@ export default function Settings() {
   const [rememberWin, setRememberWin] = useState(true);
   const [autoStart, setAutoStart] = useState(false);
   const [hotkey, setHotkey] = useState(true);
+  const [searchExcludes, setSearchExcludes] = useState("");
+  const [searchExts, setSearchExts] = useState("");
   const [startPage, setStartPage] = useState(localStorage.getItem(START_PAGE_KEY) ?? "last");
 
   useEffect(() => {
@@ -27,6 +31,8 @@ export default function Settings() {
         setCloseToTray(s.close_to_tray);
         setRememberWin(s.remember_window);
         setHotkey(s.hotkey_enabled);
+        setSearchExcludes(s.search_excludes.join("\n"));
+        setSearchExts(s.search_exclude_exts.join("\n"));
       })
       .catch(() => {});
     isEnabled()
@@ -69,6 +75,19 @@ export default function Settings() {
     } catch (e) {
       showToast(String(e), "error");
     }
+  }
+
+  function saveSearchRules() {
+    invoke("settings_set", {
+      searchExcludes: searchExcludes
+        .split("\n")
+        .map((x) => x.trim())
+        .filter(Boolean),
+      searchExcludeExts: searchExts
+        .split("\n")
+        .map((x) => x.trim().replace(/^\./, ""))
+        .filter(Boolean),
+    }).catch((e) => showToast(String(e), "error"));
   }
 
   function setStart(v: string) {
@@ -141,6 +160,47 @@ export default function Settings() {
                 [{ value: "last", label: "记住上次页面" }, ...tools.map((t) => ({ value: t.id, label: t.name }))]
               }
             />
+          </div>
+        </div>
+      </div>
+
+      <div className="field">
+        <span className="field-label">文件搜索 · 排除规则</span>
+        <div className="kv-list">
+          <div className="kv-row">
+            <span className="kv-k" style={{ minWidth: 90 }}>关键字</span>
+            <span className="hint" style={{ flex: 1 }}>
+              文件或文件夹的完整路径包含以下关键字时跳过，每行一条
+            </span>
+          </div>
+          <div className="kv-row">
+            <textarea
+              className="textarea input-mono"
+              style={{ height: 110, flex: 1 }}
+              value={searchExcludes}
+              onChange={(e) => setSearchExcludes(e.target.value)}
+              onBlur={saveSearchRules}
+              spellCheck={false}
+            />
+          </div>
+          <div className="kv-row">
+            <span className="kv-k" style={{ minWidth: 90 }}>后缀</span>
+            <span className="hint" style={{ flex: 1 }}>
+              这些扩展名的文件不进入索引，每行一个（不带点）
+            </span>
+          </div>
+          <div className="kv-row">
+            <textarea
+              className="textarea input-mono"
+              style={{ height: 70, flex: 1 }}
+              value={searchExts}
+              onChange={(e) => setSearchExts(e.target.value)}
+              onBlur={saveSearchRules}
+              spellCheck={false}
+            />
+          </div>
+          <div className="kv-row">
+            <span className="hint">修改后自动保存；改动只影响下次建立的索引</span>
           </div>
         </div>
       </div>

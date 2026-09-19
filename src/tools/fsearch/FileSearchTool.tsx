@@ -17,15 +17,10 @@ interface DiskInfo {
   available: number;
 }
 
-const EXCLUDES_KEY = "devtoolbox.searchExcludes";
-
 export default function FileSearchTool() {
   const [status, setStatus] = useState<SearchStatus | null>(null);
   const [disks, setDisks] = useState<DiskInfo[]>([]);
   const [roots, setRoots] = useState<Set<string>>(new Set());
-  const [excludes, setExcludes] = useState(
-    localStorage.getItem(EXCLUDES_KEY) ?? "node_modules, $RECYCLE.BIN, System Volume Information",
-  );
   const [q, setQ] = useState("");
   const [results, setResults] = useState<string[] | null>(null);
   const timer = useRef<number | undefined>(undefined);
@@ -76,10 +71,6 @@ export default function FileSearchTool() {
     try {
       await invoke("search_start", {
         roots: [...roots],
-        excludes: excludes
-          .split(/[,，;\n]/)
-          .map((x) => x.trim())
-          .filter(Boolean),
       });
       refreshStatus();
     } catch (e) {
@@ -112,11 +103,6 @@ export default function FileSearchTool() {
 
   function reveal(path: string) {
     invoke("sb_reveal", { path }).catch(() => {});
-  }
-
-  function setExcludesRun(v: string) {
-    setExcludes(v);
-    localStorage.setItem(EXCLUDES_KEY, v);
   }
 
   const readyText = useMemo(() => {
@@ -164,13 +150,7 @@ export default function FileSearchTool() {
             </button>
           )}
         </div>
-        <input
-          className="input"
-          value={excludes}
-          onChange={(e) => setExcludesRun(e.target.value)}
-          placeholder="排除规则：路径包含以下关键字即跳过，逗号分隔"
-          spellCheck={false}
-        />
+        <span className="hint">排除规则（内置 node_modules、回收站等常见项）在「设置」页修改</span>
       </div>
 
       <div className="field">

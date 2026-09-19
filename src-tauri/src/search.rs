@@ -60,7 +60,13 @@ fn save_cache(app: &AppHandle, paths: &Arc<Vec<Box<str>>>) {
     }
 }
 
-fn index_worker(app: AppHandle, state: SearchState, roots: Vec<String>, excludes: Vec<String>) {
+fn index_worker(
+    app: AppHandle,
+    state: SearchState,
+    roots: Vec<String>,
+    excludes: Vec<String>,
+    exclude_exts: Vec<String>,
+) {
     let excludes_lc: Vec<String> = excludes.iter().map(|e| e.to_lowercase()).collect();
     let mut vec: Vec<Box<str>> = Vec::with_capacity(200_000);
     let mut last_emit = Instant::now();
@@ -83,6 +89,12 @@ fn index_worker(app: AppHandle, state: SearchState, roots: Vec<String>, excludes
             let p = entry.path();
             if p.to_string_lossy().len() == 3 && p.to_string_lossy().ends_with('\\') {
                 continue; // 跳过盘符根本身
+            }
+            if let Some(ext) = p.extension() {
+                let ext = ext.to_string_lossy().to_lowercase();
+                if exclude_exts.iter().any(|x| *x == ext) {
+                    continue;
+                }
             }
             vec.push(p.to_string_lossy().to_string().into_boxed_str());
             if last_emit.elapsed().as_millis() >= 400 {
@@ -118,8 +130,8 @@ fn index_worker(app: AppHandle, state: SearchState, roots: Vec<String>, excludes
 pub async fn search_start(
     app: AppHandle,
     state: tauri::State<'_, SearchState>,
+    settings: tauri::State<'_, crate::settings::SettingsState>,
     roots: Vec<String>,
-    excludes: Vec<String>,
 ) -> Result<(), String> {
     if state.indexing.load(Ordering::Relaxed) {
         return Err("索引正在进行中，请先取消".into());
@@ -131,9 +143,13 @@ pub async fn search_start(
     state.indexing.store(true, Ordering::Relaxed);
     state.stop.store(false, Ordering::Relaxed);
     *state.paths.write().unwrap() = Arc::new(Vec::new());
+    let (excludes, exts) = {
+        let cfg = settings.0.lock().unwrap();
+        (cfg.search_excludes.clone(), cfg.search_exclude_exts.clone())
+    };
     let app2 = app.clone();
     let st = state.inner().clone();
-    std::thread::spawn(move || index_worker(app2, st, roots, excludes));
+    std::thread::spawn(move || index_worker(app2, st, roots, excludes, exts));
     Ok(())
 }
 

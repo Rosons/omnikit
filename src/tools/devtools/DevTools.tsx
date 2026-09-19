@@ -4,6 +4,8 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { format, type SqlLanguage } from "sql-formatter";
+import Prism from "prismjs";
+import "prismjs/components/prism-sql";
 import { md5 } from "./md5";
 import { fmtBytes, fmtDuration, fmtTime, baseName } from "../../lib/format";
 import { showToast } from "../../components/Toast";
@@ -790,6 +792,11 @@ function SqlTool() {
   const [input, setInput] = useState("");
   const [lang, setLang] = useState<SqlLanguage>("sql");
   const [output, setOutput] = useState("");
+  // 高亮后的 HTML(仅用于展示;复制的仍是纯文本 output)
+  const highlighted = useMemo(
+    () => (output ? Prism.highlight(output, Prism.languages.sql, "sql") : ""), 
+    [output]
+  );
 
   function run() {
     if (!input.trim()) return;
@@ -847,7 +854,9 @@ function SqlTool() {
             结果
             <CopyButton text={output} />
           </span>
-          <textarea className="textarea input-mono" style={{ height: 260 }} value={output} readOnly spellCheck={false} />
+          <div className="sql-out">
+            <pre dangerouslySetInnerHTML={{ __html: highlighted }} />
+          </div>
         </div>
       )}
     </div>

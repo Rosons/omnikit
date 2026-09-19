@@ -186,6 +186,7 @@ devtoolbox/
 - **SQL 格式化**(开发小工具第 7 个子 Tab):npm `sql-formatter`,方言胶囊(标准 SQL/PostgreSQL/MySQL/SQLite)+关键字大写+2 空格缩进;解析失败红字提示
 - **JSON 字符串↔对象互转**(JSON 子页新增两个按钮):「字符串转对象」=JSON.parse 输入,结果为字符串则再 parse 并格式化(兜底:手工去转义 `\\`→`\`、`\"`→`"` 后解析);「对象转字符串」=JSON.stringify(JSON.stringify(parsed)) 输出转义串字面量
 - 侧边栏现为 4 组 13 个工具;新图标 GaugeIcon 仪表盘
+- **SQL 语法高亮**(用户要求):prismjs(仅引入 SQL 语法组件)对格式化结果高亮展示——关键词蓝加粗/字符串绿/函数紫/数字橙/注释灰斜体(`.sql-out .token.*`);复制按钮复制的仍是纯文本;结果区从 textarea 改为可滚动 pre 容器
 
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)

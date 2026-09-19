@@ -1599,6 +1599,34 @@ body {
 }
 .mon-disk-bar > div.hot { background: var(--danger); }
 
+/* ===== SQL 高亮结果 ===== */
+.sql-out {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  padding: 10px 12px;
+  max-height: 320px;
+  overflow: auto;
+}
+.sql-out pre {
+  margin: 0;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text-1);
+}
+/* prism token 配色(浅色主题,与全局蓝主色协调) */
+.sql-out .token.keyword { color: #0550ae; font-weight: 600; }
+.sql-out .token.string { color: #0a7d3f; }
+.sql-out .token.function { color: #8250df; }
+.sql-out .token.number,
+.sql-out .token.boolean { color: #b3541e; }
+.sql-out .token.comment { color: var(--text-3); font-style: italic; }
+.sql-out .token.operator,
+.sql-out .token.punctuation { color: var(--text-2); }
+
 /* 紧凑控件(密码生成/Cron 生成器的数字输入与小按钮) */
 .input-sm { height: 28px; }
 .btn-sm { height: 28px; padding: 0 16px; font-size: 12.5px; }

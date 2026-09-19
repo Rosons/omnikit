@@ -213,7 +213,7 @@ export default function Settings() {
               DevToolbox
             </span>
             <span className="hint">
-              v0.1.0 · 开发者个人工具箱 · 全部功能本地处理，数据不出设备
+              v0.8.0 · 开发者个人工具箱 · 全部功能本地处理，数据不出设备
             </span>
           </div>
         </div>

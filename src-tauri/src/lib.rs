@@ -116,10 +116,26 @@ pub fn run() {
             app.manage(SettingsState(std::sync::Mutex::new(s.clone())));
             if let Some(g) = s.window {
                 if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.set_position(tauri::PhysicalPosition::new(g.x, g.y));
-                    let _ = w.set_size(tauri::PhysicalSize::new(g.w, g.h));
-                    if g.maximized {
-                        let _ = w.maximize();
+                    // 校验:尺寸过小或中心不在主屏内则放弃恢复(避免最小化坐标 -32000 导致窗口不可见)
+                    let mut sane = g.w >= 400 && g.h >= 300;
+                    if sane {
+                        if let Some(Some(mon)) = w.primary_monitor().ok().map(|m| m) {
+                            let mp = mon.position();
+                            let ms = mon.size();
+                            let cx = g.x + (g.w as i32) / 2;
+                            let cy = g.y + (g.h as i32) / 2;
+                            sane = cx >= mp.x
+                                && cx <= mp.x + ms.width as i32
+                                && cy >= mp.y
+                                && cy <= mp.y + ms.height as i32;
+                        }
+                    }
+                    if sane {
+                        let _ = w.set_position(tauri::PhysicalPosition::new(g.x, g.y));
+                        let _ = w.set_size(tauri::PhysicalSize::new(g.w, g.h));
+                        if g.maximized {
+                            let _ = w.maximize();
+                        }
                     }
                 }
             }
@@ -181,8 +197,13 @@ pub fn run() {
                 let remember = st.0.lock().unwrap().remember_window;
                 if remember {
                     if let Some(w) = app.get_webview_window("main") {
+                        let minimized = w.is_minimized().unwrap_or(false);
                         let maximized = w.is_maximized().unwrap_or(false);
                         if let (Ok(pos), Ok(size)) = (w.outer_position(), w.inner_size()) {
+                            // 最小化时坐标是 -32000/0,跳过保存沿用上次的好几何
+                            if minimized || size.width == 0 {
+                                return;
+                            }
                             let mut s = st.0.lock().unwrap().clone();
                             s.window = Some(settings::WindowGeom {
                                 x: pos.x,

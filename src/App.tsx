@@ -156,7 +156,7 @@ export default function App() {
             <span className="tool-name">设置</span>
           </button>
         </div>
-        <div className="sidebar-footer">v0.1.0 · 本地处理，数据不出设备</div>
+        <div className="sidebar-footer">v0.8.0 · 本地处理，数据不出设备</div>
       </aside>
 
       <main className="main">

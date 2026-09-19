@@ -1222,6 +1222,87 @@ pub fn disk_trash(path: String) -> Result<(), String> {
     trash::delete(&path).map_err(|e| format!("移入回收站失败：{e}"))
 }
 
+/* ---------- 系统监控 ---------- */
+
+#[derive(Serialize)]
+pub struct SysDisk {
+    pub mount: String,
+    pub total: u64,
+    pub available: u64,
+}
+
+#[derive(Serialize)]
+pub struct SysOverview {
+    pub cpu_usage: f32,
+    pub cores: Vec<f32>,
+    pub mem_total: u64,
+    pub mem_used: u64,
+    pub disks: Vec<SysDisk>,
+    pub os_name: String,
+    pub uptime_secs: u64,
+    pub process_count: usize,
+}
+
+#[tauri::command]
+pub async fn sys_overview() -> Result<SysOverview, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
+        // CPU 使用率需要两次采样才有意义
+        let mut sys = System::new();
+        sys.refresh_cpu_usage();
+        std::thread::sleep(Duration::from_millis(250));
+        sys.refresh_cpu_usage();
+        sys.refresh_memory();
+        sys.refresh_processes_specifics(
+            ProcessesToUpdate::All,
+            true,
+            ProcessRefreshKind::nothing(),
+        );
+
+        let cores: Vec<f32> = sys.cpus().iter().map(|c| c.cpu_usage()).collect();
+        let cpu_usage = if cores.is_empty() {
+            0.0
+        } else {
+            cores.iter().sum::<f32>() / cores.len() as f32
+        };
+
+        let disks = sysinfo::Disks::new_with_refreshed_list();
+        let disk_list: Vec<SysDisk> = disks
+            .list()
+            .iter()
+            .filter(|d| d.total_space() > 0)
+            .map(|d| SysDisk {
+                mount: d.mount_point().to_string_lossy().into_owned(),
+                total: d.total_space(),
+                available: d.available_space(),
+            })
+            .collect();
+
+        let os_name = [
+            System::name().unwrap_or_default(),
+            System::os_version().unwrap_or_default(),
+        ]
+        .iter()
+        .filter(|s| !s.is_empty())
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(" ");
+
+        Ok(SysOverview {
+            cpu_usage: (cpu_usage * 10.0).round() / 10.0,
+            cores: cores.iter().map(|c| (c * 10.0).round() / 10.0).collect(),
+            mem_total: sys.total_memory(),
+            mem_used: sys.used_memory(),
+            disks: disk_list,
+            os_name,
+            uptime_secs: System::uptime(),
+            process_count: sys.processes().len(),
+        })
+    })
+    .await
+    .map_err(|e| format!("任务执行失败：{e}"))?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

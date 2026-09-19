@@ -30,7 +30,8 @@ pub fn run() {
             commands::http_request,
             commands::disk_find_dupes,
             commands::disk_dir_sizes,
-            commands::disk_trash
+            commands::disk_trash,
+            commands::sys_overview
         ])
         .run(tauri::generate_context!())
         .expect("DevToolbox 启动失败");

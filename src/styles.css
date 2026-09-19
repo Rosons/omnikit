@@ -1529,6 +1529,76 @@ body {
 .crumb-item.cur:hover { background: none; }
 .crumb-sep { color: var(--text-3); flex: none; }
 
+/* ===== 系统监控 ===== */
+.mon-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.mon-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mon-label { font-size: 12.5px; color: var(--text-2); font-weight: 500; }
+.mon-big { font-size: 30px; font-weight: 700; color: var(--text-1); line-height: 1; }
+.mon-unit { font-size: 14px; font-weight: 500; color: var(--text-3); margin-left: 2px; }
+.mon-bar {
+  height: 6px;
+  background: var(--fill-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.mon-bar > div {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 400ms var(--ease);
+}
+.mon-sub { font-size: 12px; color: var(--text-3); }
+.mon-cores { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.mon-core {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 24px;
+}
+.mon-core-bar {
+  width: 100%;
+  height: 36px;
+  background: var(--fill-2);
+  border-radius: 3px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.mon-core-bar > div {
+  width: 100%;
+  background: var(--primary);
+  transition: height 400ms var(--ease);
+}
+.mon-core span { font-size: 10px; color: var(--text-3); }
+.mon-mount { width: 90px; }
+.mon-disk-bar {
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  background: var(--fill-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.mon-disk-bar > div {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+}
+.mon-disk-bar > div.hot { background: var(--danger); }
+
 /* 紧凑控件(密码生成/Cron 生成器的数字输入与小按钮) */
 .input-sm { height: 28px; }
 .btn-sm { height: 28px; padding: 0 16px; font-size: 12.5px; }

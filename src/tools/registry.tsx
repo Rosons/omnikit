@@ -5,11 +5,12 @@ import { lazy } from "react";
  * 工具模块注册表 —— 未来新工具只需在 tools 数组里加一条,
  * 侧边栏与路由自动生成,无需改动 App。
  */
-export type ToolGroup = "file" | "dev" | "misc";
+export type ToolGroup = "file" | "dev" | "system" | "misc";
 
 export const GROUPS: { id: ToolGroup; name: string }[] = [
   { id: "file", name: "文件工具" },
   { id: "dev", name: "开发工具" },
+  { id: "system", name: "系统工具" },
   { id: "misc", name: "常用工具" },
 ];
 
@@ -65,7 +66,7 @@ export const tools: ToolModule[] = [
   },
   {
     id: "port",
-    group: "dev" as ToolGroup,
+    group: "system" as ToolGroup,
     name: "端口占用",
     desc: "查看监听端口并结束进程",
     icon: PortIcon,
@@ -118,6 +119,14 @@ export const tools: ToolModule[] = [
     desc: "重复文件查找与目录大小",
     icon: DiskIcon,
     component: lazy(() => import("./disk/DiskTool")),
+  },
+  {
+    id: "monitor",
+    group: "system" as ToolGroup,
+    name: "系统监控",
+    desc: "CPU、内存与磁盘实时状态",
+    icon: GaugeIcon,
+    component: lazy(() => import("./monitor/MonitorTool")),
   },
 ];
 
@@ -289,6 +298,21 @@ function DiskIcon({ size = 16 }: { size?: number }) {
       <circle cx="12" cy="12" r="9" fill="#9fcdfb" />
       <path d="M12 3a9 9 0 0 1 9 9h-9z" fill="#06a7ff" />
       <circle cx="12" cy="12" r="9" stroke="#06a7ff" strokeWidth="2" fill="none" />
+    </svg>
+  );
+}
+
+function GaugeIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M3.5 15.5a8.5 8.5 0 1 1 17 0z"
+        fill="#9fcdfb"
+      />
+      <path d="M3.5 15.5a8.5 8.5 0 1 1 17 0" stroke="#06a7ff" strokeWidth="2" fill="none" />
+      <path d="M12 15.5L16 9.5" stroke="#06a7ff" strokeWidth="2.2" strokeLinecap="round" />
+      <circle cx="12" cy="15.5" r="1.8" fill="#06a7ff" />
+      <rect x="3" y="17.5" width="18" height="2.4" rx="1.2" fill="#06a7ff" />
     </svg>
   );
 }

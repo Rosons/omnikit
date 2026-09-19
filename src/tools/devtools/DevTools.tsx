@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
+import { format, type SqlLanguage } from "sql-formatter";
 import { md5 } from "./md5";
 import { fmtBytes, fmtDuration, fmtTime, baseName } from "../../lib/format";
 import { showToast } from "../../components/Toast";
@@ -15,6 +16,7 @@ const TABS = [
   { id: "uuid", name: "UUID" },
   { id: "hash", name: "哈希" },
   { id: "jwt", name: "JWT" },
+  { id: "sql", name: "SQL" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -40,6 +42,7 @@ export default function DevTools() {
       {tab === "uuid" && <UuidTool />}
       {tab === "hash" && <HashTool />}
       {tab === "jwt" && <JwtTool />}
+      {tab === "sql" && <SqlTool />}
     </div>
   );
 }
@@ -48,6 +51,38 @@ export default function DevTools() {
 function JsonTool() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
+
+  // 转义串还原:如 "{\"a\":1}" 解析并格式化为对象
+  function strToObj() {
+    try {
+      const parsed: unknown = JSON.parse(input);
+      if (typeof parsed === "string") {
+        setOutput(JSON.stringify(JSON.parse(parsed), null, 2));
+      } else {
+        setOutput(JSON.stringify(parsed, null, 2));
+        showToast("输入本身就是 JSON 对象，已按格式化输出", "info", 3000);
+      }
+    } catch {
+      try {
+        const unescaped = input.replace(/\\\\/g, "\\").replace(/\\"/g, '"');
+        setOutput(JSON.stringify(JSON.parse(unescaped), null, 2));
+      } catch {
+        setOutput("");
+        showToast("无法解析为 JSON 字符串，请检查转义格式", "error", 5000);
+      }
+    }
+  }
+
+  // 对象转转义字符串:输出带引号的 JSON 字符串字面量
+  function objToStr() {
+    try {
+      const parsed = JSON.parse(input);
+      setOutput(JSON.stringify(JSON.stringify(parsed)));
+    } catch {
+      setOutput("");
+      showToast("输入不是合法 JSON，无法转为字符串", "error", 5000);
+    }
+  }
 
   function run(pretty: boolean) {
     try {
@@ -77,6 +112,12 @@ function JsonTool() {
         </button>
         <button className="btn" onClick={() => run(false)} disabled={!input.trim()}>
           压缩
+        </button>
+        <button className="btn" onClick={strToObj} disabled={!input.trim()}>
+          字符串转对象
+        </button>
+        <button className="btn" onClick={objToStr} disabled={!input.trim()}>
+          对象转字符串
         </button>
         <button
           className="btn"
@@ -363,11 +404,27 @@ function FileHashView({ active }: { active: boolean }) {
   const [hashPct, setHashPct] = useState(0);
   const [fileRes, setFileRes] = useState<FileHashResult | null>(null);
   const [fileDrag, setFileDrag] = useState(false);
+  const [expected, setExpected] = useState("");
+
+  // 期望值比对:忽略大小写与空白,命中任一算法即一致
+  const compare = (() => {
+    const e = expected.trim().toLowerCase().replace(/\s+/g, "");
+    if (!fileRes || !e) return null;
+    const pairs: [string, string][] = [
+      ["MD5", fileRes.md5],
+      ["SHA-1", fileRes.sha1],
+      ["SHA-256", fileRes.sha256],
+      ["SHA-512", fileRes.sha512],
+    ];
+    const hit = pairs.find(([, v]) => v.toLowerCase() === e);
+    return hit ? `✓ 与 ${hit[0]} 一致` : "✗ 与期望值不一致";
+  })();
 
   function clearFile() {
     setFileName("");
     setFileRes(null);
     setHashPct(0);
+    setExpected("");
   }
 
   function selectFile(path: string) {
@@ -467,6 +524,22 @@ function FileHashView({ active }: { active: boolean }) {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="field">
+        <span className="field-label">期望哈希值（可选，粘贴官方校验值自动比对）</span>
+        <input
+          className="input input-mono"
+          value={expected}
+          onChange={(e) => setExpected(e.target.value)}
+          placeholder="如 5d41402abc4b2a76b9719d911017c592"
+          spellCheck={false}
+        />
+        {compare && (
+          <span className={`jwt-chip ${compare.startsWith("✓") ? "valid" : "expired"}`}>
+            {compare}
+          </span>
+        )}
       </div>
 
       <div className="tool-actions">
@@ -700,6 +773,82 @@ function JwtTool() {
             <input className="input input-mono" value={info.signature || "（空，未签名）"} readOnly spellCheck={false} />
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+/* ---------- SQL 格式化 ---------- */
+const SQL_LANGS: { id: SqlLanguage; name: string }[] = [
+  { id: "sql", name: "标准 SQL" },
+  { id: "postgresql", name: "PostgreSQL" },
+  { id: "mysql", name: "MySQL" },
+  { id: "sqlite", name: "SQLite" },
+];
+
+function SqlTool() {
+  const [input, setInput] = useState("");
+  const [lang, setLang] = useState<SqlLanguage>("sql");
+  const [output, setOutput] = useState("");
+
+  function run() {
+    if (!input.trim()) return;
+    try {
+      setOutput(
+        format(input, { language: lang, keywordCase: "upper", tabWidth: 2, useTabs: false }),
+      );
+    } catch (e) {
+      setOutput("");
+      showToast(`SQL 解析失败：${String(e)}`, "error", 5000);
+    }
+  }
+
+  return (
+    <div className="stack">
+      <div className="field">
+        <span className="field-label">SQL 语句</span>
+        <textarea
+          className="textarea input-mono"
+          style={{ height: 130 }}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="粘贴 SQL，格式化后关键字大写、缩进对齐"
+          spellCheck={false}
+        />
+      </div>
+      <div className="tool-actions">
+        <div className="diff-opts">
+          {SQL_LANGS.map((l) => (
+            <button
+              key={l.id}
+              className={`opt-chip${lang === l.id ? " on" : ""}`}
+              onClick={() => setLang(l.id)}
+            >
+              {l.name}
+            </button>
+          ))}
+        </div>
+        <button className="btn btn-primary" onClick={run} disabled={!input.trim()}>
+          格式化
+        </button>
+        <button
+          className="btn"
+          onClick={() => {
+            setInput("");
+            setOutput("");
+          }}
+        >
+          清空
+        </button>
+      </div>
+      {output && (
+        <div className="field">
+          <span className="field-label">
+            结果
+            <CopyButton text={output} />
+          </span>
+          <textarea className="textarea input-mono" style={{ height: 260 }} value={output} readOnly spellCheck={false} />
+        </div>
       )}
     </div>
   );

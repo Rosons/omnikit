@@ -401,7 +401,7 @@ function SizeView() {
                     />
                   </div>
                   <span className="kv-v">{fmtBytes(it.bytes)}</span>
-                  <span className="kv-k">{it.files} 个文件</span>
+                  {it.is_dir && <span className="kv-k">{it.files} 个文件</span>}
                   {it.is_dir && (
                     <button className="btn-text" onClick={() => scan(it.path)}>
                       进入

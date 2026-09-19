@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { tools } from "../registry";
 import { showToast } from "../../components/Toast";
+import Switch from "../../components/Switch";
 
 interface AppSettings {
   close_to_tray: boolean;
@@ -74,9 +75,7 @@ export default function Settings() {
             <span className="hint" style={{ flex: 1 }}>
               关闭窗口后保留在系统托盘，左键托盘图标恢复，右键菜单退出
             </span>
-            <button className={`opt-chip${closeToTray ? " on" : ""}`} onClick={() => setClose(!closeToTray)}>
-              {closeToTray ? "开" : "关"}
-            </button>
+            <Switch on={closeToTray} onChange={setClose} />
           </div>
           <div className="kv-row">
             <span className="kv-k" style={{ minWidth: 170 }}>
@@ -85,9 +84,7 @@ export default function Settings() {
             <span className="hint" style={{ flex: 1 }}>
               下次启动恢复上次关闭时的窗口布局
             </span>
-            <button className={`opt-chip${rememberWin ? " on" : ""}`} onClick={() => setRemember(!rememberWin)}>
-              {rememberWin ? "开" : "关"}
-            </button>
+            <Switch on={rememberWin} onChange={setRemember} />
           </div>
           <div className="kv-row">
             <span className="kv-k" style={{ minWidth: 170 }}>
@@ -96,9 +93,7 @@ export default function Settings() {
             <span className="hint" style={{ flex: 1 }}>
               写入当前用户的启动项，仅对当前账户生效
             </span>
-            <button className={`opt-chip${autoStart ? " on" : ""}`} onClick={() => setAuto(!autoStart)}>
-              {autoStart ? "开" : "关"}
-            </button>
+            <Switch on={autoStart} onChange={setAuto} />
           </div>
         </div>
       </div>

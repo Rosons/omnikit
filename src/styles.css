@@ -142,6 +142,32 @@ body {
   gap: 2px;
 }
 
+/* ===== 拨杆开关 ===== */
+.switch {
+  flex: none;
+  width: 40px;
+  height: 22px;
+  border: none;
+  border-radius: 999px;
+  background: #cdd4e0;
+  padding: 2px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: background var(--fast);
+}
+.switch.on { background: var(--primary); }
+.switch:disabled { opacity: 0.45; cursor: not-allowed; }
+.switch-knob {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(31, 35, 41, 0.28);
+  transition: transform var(--fast);
+}
+.switch.on .switch-knob { transform: translateX(18px); }
+
 .tool-item {
   display: flex;
   align-items: center;

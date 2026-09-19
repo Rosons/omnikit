@@ -24,16 +24,15 @@ export default function FileSearchTool() {
   const [roots, setRoots] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
   const [results, setResults] = useState<string[] | null>(null);
-  const timer = useRef<number | undefined>(undefined);
-  const qTimer = useRef<number | undefined>(undefined);
-
+  const [configOpen, setConfigOpen] = useState(false);
   const rootsTouched = useRef(false);
+  const qTimer = useRef<number | undefined>(undefined);
 
   async function refreshStatus() {
     try {
       const st = await invoke<SearchStatus>("search_status");
       setStatus(st);
-      // 上次索引过:自动勾选当时的范围,避免与索引实际范围不符
+      // 首次加载:自动勾选上次索引的范围
       if (!rootsTouched.current && st.roots.length > 0 && !st.indexing) {
         setRoots(new Set(st.roots));
       }
@@ -44,27 +43,15 @@ export default function FileSearchTool() {
 
   useEffect(() => {
     refreshStatus();
-    // 磁盘列表
     invoke<{ disks: DiskInfo[] }>("sys_overview")
-      .then((r) => {
-        setDisks(r.disks);
-        setRoots(new Set(r.disks.map((d) => d.mount)));
-      })
+      .then((r) => setDisks(r.disks))
       .catch(() => {});
-    // 首次进入自动加载上次索引缓存
     invoke("search_cache_load").catch(() => {});
     const un = listen<{ files: number }>("idx://progress", () => refreshStatus());
     return () => {
       un.then((fn) => fn());
     };
   }, []);
-
-  // 索引完成瞬间刷新一次
-  useEffect(() => {
-    if (status && !status.indexing && status.files > 0 && results === null && q) {
-      // 保持现状即可
-    }
-  }, [status, results, q]);
 
   function toggleRoot(m: string) {
     rootsTouched.current = true;
@@ -79,9 +66,7 @@ export default function FileSearchTool() {
   async function startIndexing() {
     rootsTouched.current = true;
     try {
-      await invoke("search_start", {
-        roots: [...roots],
-      });
+      await invoke("search_start", { roots: [...roots] });
       refreshStatus();
     } catch (e) {
       showToast(String(e), "error", 5000);
@@ -115,83 +100,78 @@ export default function FileSearchTool() {
     invoke("sb_reveal", { path }).catch(() => {});
   }
 
-  const readyText = useMemo(() => {
-    if (!status) return "";
-    const scope = status.roots.length > 0 ? ` · 范围 ${status.roots.join("、")}` : "";
-    if (status.indexing) return `索引中，已发现 ${status.files.toLocaleString()} 个文件`;
-    if (status.files > 0)
-      return `索引就绪 · ${status.files.toLocaleString()} 个文件${scope} · 建于 ${fmtTime(status.last_time)}`;
-    return "尚未建立索引";
-  }, [status]);
-
-  // 勾选范围与已建索引范围不一致时提醒
   const scopeMismatch = useMemo(() => {
     if (!status || status.indexing || status.roots.length === 0) return false;
     if (roots.size !== status.roots.length) return true;
     return [...roots].some((r) => !status.roots.includes(r));
   }, [status, roots]);
 
+  const needConfig = !status || status.indexing || status.files === 0 || scopeMismatch;
+  const configVisible = needConfig || configOpen;
+
+  const statusText = useMemo(() => {
+    if (!status) return "";
+    const scope = status.roots.length > 0 ? ` · 范围 ${status.roots.join("、")}` : "";
+    if (status.indexing) return `索引中 · ${status.files.toLocaleString()} 个文件`;
+    if (status.files > 0)
+      return `${status.files.toLocaleString()} 个文件${scope} · 建于 ${fmtTime(status.last_time)}`;
+    return "尚未建立索引";
+  }, [status]);
+
   return (
     <div className="stack fsearch-page">
-      <div className="field">
-        <span className="field-label">
-          全盘文件名索引
-          <span className="hint">{readyText}</span>
-        </span>
-        <span className="hint">
-          首次索引会遍历整个磁盘（可能需要几分钟），完成后压缩缓存到本机，下次启动自动加载；输入即搜，结果按需截取
-        </span>
-        {scopeMismatch && (
-          <span className="hint hint-error">
-            当前勾选范围与已建索引不同，搜索结果不含新勾选的磁盘；点「开始索引」按新范围重建
-          </span>
-        )}
-        <div className="tool-actions">
-          <div className="diff-opts">
-            {disks.map((d) => (
-              <button
-                key={d.mount}
-                className={`opt-chip${roots.has(d.mount) ? " on" : ""}`}
-                onClick={() => toggleRoot(d.mount)}
-                disabled={status?.indexing}
-              >
-                {d.mount}
-              </button>
-            ))}
-          </div>
-          {status?.indexing ? (
-            <button className="btn" onClick={stopIndexing}>
-              取消索引
-            </button>
-          ) : (
-            <button
-              className="btn btn-primary"
-              onClick={startIndexing}
-              disabled={roots.size === 0}
-            >
-              开始索引
-            </button>
-          )}
-        </div>
-        <span className="hint">排除规则（内置 node_modules、回收站等常见项）在「设置」页修改</span>
-      </div>
+      <input
+        className="input fs-input"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="搜索全部文件，空格分隔多个关键字，支持 * ? 通配符"
+        spellCheck={false}
+      />
 
-      <div className="field">
-        <span className="field-label">
-          文件名搜索
-          {results && <span className="hint">命中 {results.length} 条（最多显示 300 条）</span>}
-        </span>
-        <input
-          className="input"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="输入文件名或路径的一部分，不区分大小写"
-          spellCheck={false}
-        />
-      </div>
+      {configVisible && (
+        <div className="field fs-config">
+          {scopeMismatch && !status?.indexing && (
+            <span className="hint hint-error">勾选范围与已建索引不同，重建后新范围才生效</span>
+          )}
+          <div className="tool-actions">
+            <div className="diff-opts">
+              {disks.map((d) => (
+                <button
+                  key={d.mount}
+                  className={`opt-chip${roots.has(d.mount) ? " on" : ""}`}
+                  onClick={() => toggleRoot(d.mount)}
+                  disabled={status?.indexing}
+                >
+                  {d.mount}
+                </button>
+              ))}
+            </div>
+            {status?.indexing ? (
+              <button className="btn btn-sm" onClick={stopIndexing}>
+                取消索引
+              </button>
+            ) : (
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={startIndexing}
+                disabled={roots.size === 0}
+              >
+                开始索引
+              </button>
+            )}
+            {!needConfig && (
+              <button className="btn-text" onClick={() => setConfigOpen(false)}>
+                收起
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {results && results.length === 0 && (
-        <div className="port-empty">没有匹配的文件；索引未就绪时结果不完整</div>
+        <div className="port-empty">
+          没有匹配的文件{status && status.files === 0 ? "（尚未建立索引）" : ""}
+        </div>
       )}
       {results && results.length > 0 && (
         <div className="kv-list fs-list">
@@ -208,6 +188,16 @@ export default function FileSearchTool() {
           ))}
         </div>
       )}
+
+      <div className="fs-status">
+        <span className="hint">{statusText}</span>
+        <div style={{ flex: 1 }} />
+        {status && status.files > 0 && !status.indexing && !configVisible && (
+          <button className="btn-text" onClick={() => setConfigOpen(true)}>
+            重建索引
+          </button>
+        )}
+      </div>
     </div>
   );
 }

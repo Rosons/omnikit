@@ -257,6 +257,13 @@ body {
 
 /* ===== 文件搜索 ===== */
 .fsearch-page { height: 100%; min-height: 360px; }
+.fs-input { flex: none; }
+.fs-status {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .fs-list {
   flex: 1;
   min-height: 160px;

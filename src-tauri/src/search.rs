@@ -1,16 +1,16 @@
-//! 全盘文件名索引:后台遍历磁盘构建路径索引(内存),压缩缓存到本地,支持子串秒搜
+//! 全盘文件名索引:并行遍历建索引(内存),压缩缓存到本地,notify 实时跟进增删改名
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use notify::Watcher;
 use tauri::{AppHandle, Emitter, Manager};
-use walkdir::WalkDir;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct IndexMeta {
@@ -19,13 +19,29 @@ pub struct IndexMeta {
     pub time: u64,
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct SearchState {
-    pub paths: Arc<RwLock<Arc<Vec<Box<str>>>>>,
+    pub paths: Arc<RwLock<Vec<Box<str>>>>,
     pub indexing: Arc<AtomicBool>,
     pub stop: Arc<AtomicBool>,
     pub last_time: Arc<Mutex<u64>>,
     pub meta: Arc<Mutex<Option<IndexMeta>>>,
+    pub watched: Arc<Mutex<Vec<String>>>,
+    pub watcher: Arc<Mutex<Option<notify::RecommendedWatcher>>>,
+}
+
+impl Default for SearchState {
+    fn default() -> Self {
+        Self {
+            paths: Arc::new(RwLock::new(Vec::new())),
+            indexing: Arc::new(AtomicBool::new(false)),
+            stop: Arc::new(AtomicBool::new(false)),
+            last_time: Arc::new(Mutex::new(0)),
+            meta: Arc::new(Mutex::new(None)),
+            watched: Arc::new(Mutex::new(Vec::new())),
+            watcher: Arc::new(Mutex::new(None)),
+        }
+    }
 }
 
 #[derive(Serialize, Clone)]
@@ -40,6 +56,13 @@ fn cache_path(app: &AppHandle) -> Option<PathBuf> {
     app.path().app_data_dir().ok().map(|d| d.join("search-index.gz"))
 }
 
+fn meta_path(app: &AppHandle) -> Option<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .ok()
+        .map(|d| d.join("search-index.meta.json"))
+}
+
 fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -47,8 +70,26 @@ fn now() -> u64 {
         .unwrap_or(0)
 }
 
-fn meta_path(app: &AppHandle) -> Option<PathBuf> {
-    app.path().app_data_dir().ok().map(|d| d.join("search-index.meta.json"))
+fn save_cache(app: &AppHandle, paths: &[Box<str>]) {
+    let Some(p) = cache_path(app) else { return };
+    if let Some(dir) = p.parent() {
+        let _ = fs::create_dir_all(dir);
+    }
+    let tmp = p.with_extension("gz.tmp");
+    let Ok(file) = fs::File::create(&tmp) else { return };
+    let mut enc = GzEncoder::new(file, Compression::fast());
+    let mut ok = true;
+    for path in paths {
+        if enc.write_all(path.as_bytes()).is_err() || enc.write_all(b"\n").is_err() {
+            ok = false;
+            break;
+        }
+    }
+    if ok && enc.finish().is_ok() {
+        let _ = fs::rename(&tmp, &p);
+    } else {
+        let _ = fs::remove_file(&tmp);
+    }
 }
 
 fn save_meta(app: &AppHandle, meta: &IndexMeta) {
@@ -67,28 +108,6 @@ fn load_meta(app: &AppHandle) -> Option<IndexMeta> {
     serde_json::from_str(&t).ok()
 }
 
-fn save_cache(app: &AppHandle, paths: &Arc<Vec<Box<str>>>) {
-    let Some(p) = cache_path(app) else { return };
-    if let Some(dir) = p.parent() {
-        let _ = fs::create_dir_all(dir);
-    }
-    let tmp = p.with_extension("gz.tmp");
-    let Ok(file) = fs::File::create(&tmp) else { return };
-    let mut enc = GzEncoder::new(file, Compression::fast());
-    let mut ok = true;
-    for path in paths.iter() {
-        if enc.write_all(path.as_bytes()).is_err() || enc.write_all(b"\n").is_err() {
-            ok = false;
-            break;
-        }
-    }
-    if ok && enc.finish().is_ok() {
-        let _ = fs::rename(&tmp, &p);
-    } else {
-        let _ = fs::remove_file(&tmp);
-    }
-}
-
 fn index_worker(
     app: AppHandle,
     state: SearchState,
@@ -97,35 +116,44 @@ fn index_worker(
     exclude_exts: Vec<String>,
 ) {
     let excludes_lc: Vec<String> = excludes.iter().map(|e| e.to_lowercase()).collect();
+    let exts_lc: Vec<String> = exclude_exts.iter().map(|e| e.to_lowercase()).collect();
     let mut vec: Vec<Box<str>> = Vec::with_capacity(200_000);
     let mut last_emit = Instant::now();
-    let started = Instant::now();
 
     for root in &roots {
-        for entry in WalkDir::new(root)
+        let ex = excludes_lc.clone();
+        for entry in jwalk::WalkDir::new(root)
             .follow_links(false)
-            .into_iter()
-            .filter_entry(|e| {
-                // 排除规则命中目录时整枝剪掉
-                let pl = e.path().to_string_lossy().to_lowercase();
-                !excludes_lc.iter().any(|x| pl.contains(x))
+            .process_read_dir(move |_depth, _root, _state, children| {
+                // 命中排除关键字的目录整枝剪掉
+                children.retain(|r| match r {
+                    Ok(e) => {
+                        let pl = e.path().to_string_lossy().to_lowercase();
+                        !ex.iter().any(|x| pl.contains(x))
+                    }
+                    Err(_) => true,
+                })
             })
+            .into_iter()
             .filter_map(|e| e.ok())
         {
             if state.stop.load(Ordering::Relaxed) {
                 break;
             }
             let p = entry.path();
-            if p.to_string_lossy().len() == 3 && p.to_string_lossy().ends_with('\\') {
+            let lossy = p.to_string_lossy();
+            if lossy.len() == 3 && lossy.ends_with('\\') {
                 continue; // 跳过盘符根本身
             }
-            if let Some(ext) = p.extension() {
-                let ext = ext.to_string_lossy().to_lowercase();
-                if exclude_exts.iter().any(|x| *x == ext) {
-                    continue;
+            if entry.file_type().is_file() {
+                if let Some(ext) = p.extension() {
+                    let ext = ext.to_string_lossy().to_lowercase();
+                    if exts_lc.iter().any(|x| *x == ext) {
+                        continue;
+                    }
                 }
             }
-            vec.push(p.to_string_lossy().to_string().into_boxed_str());
+            vec.push(lossy.to_string().into_boxed_str());
             if last_emit.elapsed().as_millis() >= 400 {
                 last_emit = Instant::now();
                 let _ = app.emit(
@@ -140,7 +168,10 @@ fn index_worker(
     }
 
     let stopped = state.stop.load(Ordering::Relaxed);
-    *state.paths.write().unwrap() = Arc::new(vec);
+    if !stopped {
+        vec.sort_by_cached_key(|p| p.to_lowercase());
+    }
+    *state.paths.write().unwrap() = vec;
     *state.last_time.lock().unwrap() = now();
     state.indexing.store(false, Ordering::Relaxed);
     let files = state.paths.read().unwrap().len();
@@ -149,8 +180,9 @@ fn index_worker(
         serde_json::json!({ "files": files, "current": "" }),
     );
     if !stopped && files > 0 {
-        let paths = state.paths.read().unwrap().clone();
+        let paths = state.paths.read().unwrap();
         save_cache(&app, &paths);
+        drop(paths);
         let meta = IndexMeta {
             roots: roots.clone(),
             files: files as u64,
@@ -158,9 +190,130 @@ fn index_worker(
         };
         save_meta(&app, &meta);
         *state.meta.lock().unwrap() = Some(meta);
+        start_watcher(&state, roots, excludes, exclude_exts);
     }
-    let _ = started.elapsed();
 }
+
+/* ---------- 实时监听 ---------- */
+
+fn path_excluded(p: &str, excludes_lc: &[String], exts_lc: &[String]) -> bool {
+    let pl = p.to_lowercase();
+    if excludes_lc.iter().any(|x| pl.contains(x)) {
+        return true;
+    }
+    if let Some(ext) = Path::new(p).extension() {
+        let ext = ext.to_string_lossy().to_lowercase();
+        if exts_lc.iter().any(|x| *x == ext) {
+            return true;
+        }
+    }
+    false
+}
+
+fn insert_path(vec: &mut Vec<Box<str>>, path: &str, excludes_lc: &[String], exts_lc: &[String]) {
+    if path_excluded(path, excludes_lc, exts_lc) {
+        return;
+    }
+    let key = path.to_lowercase();
+    match vec.binary_search_by(|x| x.to_lowercase().cmp(&key)) {
+        Ok(_) => {}
+        Err(pos) => vec.insert(pos, path.to_owned().into_boxed_str()),
+    }
+}
+
+fn remove_path(vec: &mut Vec<Box<str>>, path: &str) {
+    let key = path.to_lowercase();
+    if let Ok(pos) = vec.binary_search_by(|x| x.to_lowercase().cmp(&key)) {
+        vec.remove(pos);
+    }
+    // 目录删除:小写路径有序,后代为连续区间,一并移除
+    let prefix = format!("{}\\", key);
+    let start = vec.partition_point(|x| x.to_lowercase().as_str() < prefix.as_str());
+    let mut end = start;
+    while end < vec.len() && vec[end].to_lowercase().starts_with(&prefix) {
+        end += 1;
+    }
+    if end > start {
+        vec.drain(start..end);
+    }
+}
+
+fn apply_event(
+    state: &SearchState,
+    event: &notify::Event,
+    excludes_lc: &[String],
+    exts_lc: &[String],
+) {
+    use notify::EventKind::{Create, Modify, Remove};
+    use notify::event::{ModifyKind, RenameMode};
+    let mut vec = state.paths.write().unwrap();
+    match &event.kind {
+        Create(_) => {
+            for p in &event.paths {
+                insert_path(&mut vec, &p.to_string_lossy(), excludes_lc, exts_lc);
+            }
+        }
+        Remove(_) => {
+            for p in &event.paths {
+                remove_path(&mut vec, &p.to_string_lossy());
+            }
+        }
+        Modify(ModifyKind::Name(mode)) => match mode {
+            RenameMode::From => {
+                for p in &event.paths {
+                    remove_path(&mut vec, &p.to_string_lossy());
+                }
+            }
+            RenameMode::To => {
+                for p in &event.paths {
+                    insert_path(&mut vec, &p.to_string_lossy(), excludes_lc, exts_lc);
+                }
+            }
+            RenameMode::Both => {
+                if let [from, to] = event.paths.as_slice() {
+                    remove_path(&mut vec, &from.to_string_lossy());
+                    insert_path(&mut vec, &to.to_string_lossy(), excludes_lc, exts_lc);
+                }
+            }
+            _ => {}
+        },
+        _ => {}
+    }
+}
+
+fn start_watcher(
+    state: &SearchState,
+    roots: Vec<String>,
+    excludes: Vec<String>,
+    exclude_exts: Vec<String>,
+) {
+    {
+        let mut watched = state.watched.lock().unwrap();
+        if *watched == roots {
+            return;
+        }
+        *watched = roots.clone();
+    }
+    let excludes_lc: Vec<String> = excludes.iter().map(|e| e.to_lowercase()).collect();
+    let exts_lc: Vec<String> = exclude_exts.iter().map(|e| e.to_lowercase()).collect();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let Ok(mut watcher) = notify::recommended_watcher(tx) else {
+        return;
+    };
+    for root in &roots {
+        let _ = watcher.watch(Path::new(root), notify::RecursiveMode::Recursive);
+    }
+    *state.watcher.lock().unwrap() = Some(watcher);
+    let st = state.clone();
+    std::thread::spawn(move || {
+        for res in rx {
+            let Ok(event) = res else { continue };
+            apply_event(&st, &event, &excludes_lc, &exts_lc);
+        }
+    });
+}
+
+/* ---------- 命令 ---------- */
 
 #[tauri::command]
 pub async fn search_start(
@@ -178,7 +331,7 @@ pub async fn search_start(
     }
     state.indexing.store(true, Ordering::Relaxed);
     state.stop.store(false, Ordering::Relaxed);
-    *state.paths.write().unwrap() = Arc::new(Vec::new());
+    *state.paths.write().unwrap() = Vec::new();
     let (excludes, exts) = {
         let cfg = settings.0.lock().unwrap();
         (cfg.search_excludes.clone(), cfg.search_exclude_exts.clone())
@@ -212,7 +365,10 @@ pub fn search_status(state: tauri::State<'_, SearchState>) -> SearchStatus {
 }
 
 #[tauri::command]
-pub async fn search_cache_load(app: AppHandle, state: tauri::State<'_, SearchState>) -> Result<(), String> {
+pub async fn search_cache_load(
+    app: AppHandle,
+    state: tauri::State<'_, SearchState>,
+) -> Result<(), String> {
     if state.indexing.load(Ordering::Relaxed) {
         return Ok(());
     }
@@ -227,28 +383,69 @@ pub async fn search_cache_load(app: AppHandle, state: tauri::State<'_, SearchSta
         let dec = GzDecoder::new(file);
         let mut vec: Vec<Box<str>> = Vec::with_capacity(100_000);
         for line in BufReader::new(dec).lines().map_while(Result::ok) {
-            if line.is_empty() { continue; }
+            if line.is_empty() {
+                continue;
+            }
             vec.push(line.into_boxed_str());
         }
-        if let Ok(meta) = fs::metadata(&p) {
-            if let Ok(t) = meta.modified() {
-                if let Ok(d) = t.duration_since(UNIX_EPOCH) {
-                    *st.last_time.lock().unwrap() = d.as_secs();
-                }
-            }
-        }
+        vec.sort_by_cached_key(|p| p.to_lowercase());
+        *st.paths.write().unwrap() = vec;
+        let (excludes, exts) = {
+            let cfg = app2.state::<crate::settings::SettingsState>();
+            let g = cfg.0.lock().unwrap();
+            (g.search_excludes.clone(), g.search_exclude_exts.clone())
+        };
         if let Some(m) = load_meta(&app2) {
             *st.last_time.lock().unwrap() = m.time;
             *st.meta.lock().unwrap() = Some(m);
         }
-        *st.paths.write().unwrap() = Arc::new(vec);
         let files = st.paths.read().unwrap().len();
         let _ = app2.emit(
             "idx://progress",
             serde_json::json!({ "files": files, "current": "" }),
         );
+        let roots = st
+            .meta
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|m| m.roots.clone())
+            .unwrap_or_default();
+        start_watcher(&st, roots, excludes, exts);
     });
     Ok(())
+}
+
+fn glob_match(pattern: &[char], text: &[char]) -> bool {
+    if pattern.is_empty() {
+        return text.is_empty();
+    }
+    match pattern[0] {
+        '*' => {
+            for i in 0..=text.len() {
+                if glob_match(&pattern[1..], &text[i..]) {
+                    return true;
+                }
+            }
+            false
+        }
+        '?' => !text.is_empty() && glob_match(&pattern[1..], &text[1..]),
+        c => {
+            !text.is_empty()
+                && text[0].eq_ignore_ascii_case(&c)
+                && glob_match(&pattern[1..], &text[1..])
+        }
+    }
+}
+
+fn token_match(token: &str, path_lc: &str) -> bool {
+    if token.contains('*') || token.contains('?') {
+        let pc: Vec<char> = token.chars().collect();
+        let tc: Vec<char> = path_lc.chars().collect();
+        glob_match(&pc, &tc)
+    } else {
+        path_lc.contains(token)
+    }
 }
 
 #[tauri::command]
@@ -257,19 +454,27 @@ pub fn search_query(
     q: String,
     limit: Option<usize>,
 ) -> Vec<String> {
-    let q = q.trim().to_lowercase();
-    if q.is_empty() {
+    let tokens: Vec<String> = q
+        .trim()
+        .split_whitespace()
+        .map(|t| t.to_lowercase())
+        .collect();
+    if tokens.is_empty() {
         return Vec::new();
     }
     let limit = limit.unwrap_or(300);
-    let paths = state.paths.read().unwrap().clone();
+    let paths = state.paths.read().unwrap();
     let mut out: Vec<String> = Vec::with_capacity(64);
-    for p in paths.iter() {
-        if p.to_lowercase().contains(&q) {
-            out.push(p.to_string());
-            if out.len() >= limit {
-                break;
+    'outer: for p in paths.iter() {
+        let pl = p.to_lowercase();
+        for t in &tokens {
+            if !token_match(t, &pl) {
+                continue 'outer;
             }
+        }
+        out.push(p.to_string());
+        if out.len() >= limit {
+            break;
         }
     }
     out

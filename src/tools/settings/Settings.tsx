@@ -14,7 +14,7 @@ interface AppSettings {
   search_exclude_exts: string[];
 }
 
-const START_PAGE_KEY = "devtoolbox.startPage";
+const START_PAGE_KEY = "omnikit.startPage";
 
 export default function Settings() {
   const [closeToTray, setCloseToTray] = useState(false);
@@ -138,7 +138,7 @@ export default function Settings() {
               全局快捷键唤起窗口
             </span>
             <span className="hint" style={{ flex: 1 }}>
-              在任何应用里按 Alt+Q，随时显示或隐藏 DevToolbox
+              在任何应用里按 Alt+Q，随时显示或隐藏 OmniKit
             </span>
             <Switch on={hotkey} onChange={setHotkeyRun} />
           </div>

@@ -14,7 +14,7 @@ let pending: DecryptPrefill | null = null;
 export function requestDecrypt(boxPath: string, outDir: string) {
   pending = { v: ++seq, boxPath, outDir };
   window.dispatchEvent(
-    new CustomEvent("devtoolbox:navigate", { detail: { id: "safebox" } })
+    new CustomEvent("omnikit:navigate", { detail: { id: "safebox" } })
   );
 }
 
@@ -27,6 +27,6 @@ export function peekDecryptPrefill(lastApplied: number): DecryptPrefill | null {
 /** 通用工具切换事件(供 App 侧边栏响应) */
 export function requestNavigate(id: string) {
   window.dispatchEvent(
-    new CustomEvent("devtoolbox:navigate", { detail: { id } })
+    new CustomEvent("omnikit:navigate", { detail: { id } })
   );
 }

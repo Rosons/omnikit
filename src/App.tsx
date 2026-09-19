@@ -5,7 +5,7 @@ import { ConfirmHost } from "./components/ConfirmDialog";
 import Settings from "./tools/settings/Settings";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
-const COLLAPSE_KEY = "devtoolbox.sidebar.collapsed";
+const COLLAPSE_KEY = "omnikit.sidebar.collapsed";
 
 function loadCollapsed(): Set<ToolGroup> {
   try {
@@ -17,9 +17,9 @@ function loadCollapsed(): Set<ToolGroup> {
 }
 
 function loadStartPage(): string {
-  const sp = localStorage.getItem("devtoolbox.startPage") ?? "last";
+  const sp = localStorage.getItem("omnikit.startPage") ?? "last";
   if (sp !== "last" && tools.some((t) => t.id === sp)) return sp;
-  const last = localStorage.getItem("devtoolbox.lastPage");
+  const last = localStorage.getItem("omnikit.lastPage");
   if (last && tools.some((t) => t.id === last)) return last;
   return tools[0].id;
 }
@@ -38,7 +38,7 @@ export default function App() {
   }, [collapsed]);
   // 记录上次页面,供「记住上次页面」启动项使用
   useEffect(() => {
-    localStorage.setItem("devtoolbox.lastPage", activeId);
+    localStorage.setItem("omnikit.lastPage", activeId);
   }, [activeId]);
 
   // 切换到某工具时,自动展开其所在分组
@@ -63,8 +63,8 @@ export default function App() {
         setShowSettings(false);
       }
     };
-    window.addEventListener("devtoolbox:navigate", handler);
-    return () => window.removeEventListener("devtoolbox:navigate", handler);
+    window.addEventListener("omnikit:navigate", handler);
+    return () => window.removeEventListener("omnikit:navigate", handler);
   }, []);
 
   function toggleGroup(g: ToolGroup) {

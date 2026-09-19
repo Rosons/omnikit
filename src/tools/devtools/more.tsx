@@ -5,6 +5,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { showToast } from "../../components/Toast";
 import CopyButton from "../../components/CopyButton";
 import { fmtBytes, baseName } from "../../lib/format";
+import { dump as yamlDump, load as yamlLoad } from "js-yaml";
 
 /* ---------- URL 解析 ---------- */
 export function UrlTool() {
@@ -371,6 +372,134 @@ export function FileB64Tool() {
         </>
       )}
       <div className="hint">常见文本与图片类型会识别 MIME；嵌入式资源、接口调试传参时直接复制 data URI</div>
+    </div>
+  );
+}
+
+/* ---------- 配置转换:YAML / JSON / properties ---------- */
+function parseProps(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (let raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#") || line.startsWith("!")) continue;
+    let idx = -1;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === "\\") { i++; continue; }
+      if (c === "=" || c === ":") { idx = i; break; }
+    }
+    if (idx < 0) { out[line] = ""; continue; }
+    const key = line.slice(0, idx).trim();
+    const val = line.slice(idx + 1).trim();
+    if (key) out[key] = val;
+  }
+  return out;
+}
+
+function unflatten(map: Record<string, string>): Record<string, unknown> {
+  const root: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(map)) {
+    const parts = k.split(".");
+    let cur = root as Record<string, unknown>;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const key = parts[i];
+      if (typeof cur[key] !== "object" || cur[key] === null) cur[key] = {};
+      cur = cur[key] as Record<string, unknown>;
+    }
+    cur[parts[parts.length - 1]] = v;
+  }
+  return root;
+}
+
+function flatten(obj: unknown, prefix = "", out: Record<string, string> = {}): Record<string, string> {
+  if (obj && typeof obj === "object") {
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+      const key = prefix ? `${prefix}.${k}` : k;
+      if (v && typeof v === "object" && !Array.isArray(v)) flatten(v, key, out);
+      else out[key] = Array.isArray(v) ? JSON.stringify(v) : String(v ?? "");
+    }
+  }
+  return out;
+}
+
+const CONF_MODES = [
+  { k: "y2j", label: "YAML 转 JSON" },
+  { k: "j2y", label: "JSON 转 YAML" },
+  { k: "p2y", label: "properties 转 YAML" },
+  { k: "y2p", label: "YAML 转 properties" },
+] as const;
+type ConfMode = (typeof CONF_MODES)[number]["k"];
+
+export function ConfTool() {
+  const [mode, setMode] = useState<ConfMode>("y2j");
+  const [input, setInput] = useState("");
+  const [output, setOutput] = useState("");
+  const [err, setErr] = useState("");
+
+  function run() {
+    setErr("");
+    setOutput("");
+    try {
+      switch (mode) {
+        case "y2j": {
+          const obj = yamlLoad(input);
+          setOutput(JSON.stringify(obj, null, 2));
+          break;
+        }
+        case "j2y": {
+          setOutput(yamlDump(JSON.parse(input), { lineWidth: -1, noRefs: true }));
+          break;
+        }
+        case "p2y": {
+          setOutput(yamlDump(unflatten(parseProps(input)), { lineWidth: -1, noRefs: true }));
+          break;
+        }
+        case "y2p": {
+          const obj = yamlLoad(input);
+          if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
+            throw new Error("顶层必须是键值对象");
+          }
+          const flat = flatten(obj);
+          setOutput(Object.entries(flat).map(([k, v]) => `${k} = ${v}`).join("\n"));
+          break;
+        }
+      }
+    } catch (e) {
+      setErr(String(e).replace(/^YAMLError:\s*/, ""));
+    }
+  }
+
+  return (
+    <div className="stack">
+      <div className="field">
+        <span className="field-label">配置转换</span>
+        <span className="hint">YAML、JSON 与 Java properties 三种格式互转；properties 的点号键（如 a.b.c）会按层级拆解或合并</span>
+        <div className="diff-opts">
+          {CONF_MODES.map((m) => (
+            <button key={m.k} className={`opt-chip${mode === m.k ? " on" : ""}`} onClick={() => setMode(m.k)}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="field">
+        <span className="field-label">输入</span>
+        <textarea className="textarea input-mono" style={{ height: 170 }} value={input} onChange={(e) => setInput(e.target.value)} spellCheck={false} />
+      </div>
+      <div className="tool-actions">
+        <button className="btn btn-primary" onClick={run} disabled={!input.trim()}>转换</button>
+        <button className="btn" onClick={() => { setInput(""); setOutput(""); setErr(""); }}>清空</button>
+        {err && <span className="hint hint-error">{err}</span>}
+      </div>
+      {output && (
+        <div className="field">
+          <span className="field-label">
+            输出
+            <CopyButton text={output} />
+          </span>
+          <textarea className="textarea input-mono" style={{ height: 220 }} value={output} readOnly spellCheck={false} />
+        </div>
+      )}
     </div>
   );
 }

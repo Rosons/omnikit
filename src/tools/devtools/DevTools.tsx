@@ -10,7 +10,7 @@ import { md5 } from "./md5";
 import { fmtBytes, fmtDuration, fmtTime, baseName } from "../../lib/format";
 import { showToast } from "../../components/Toast";
 import CopyButton from "../../components/CopyButton";
-import { UrlTool, TextBatchTool, RadixTool, FileB64Tool } from "./more";
+import { UrlTool, TextBatchTool, RadixTool, FileB64Tool, ConfTool } from "./more";
 
 const TABS = [
   { id: "json", name: "JSON" },
@@ -24,6 +24,7 @@ const TABS = [
   { id: "text", name: "批处理" },
   { id: "radix", name: "进制" },
   { id: "b64", name: "Base64" },
+  { id: "conf", name: "配置" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -54,6 +55,7 @@ export default function DevTools() {
       {tab === "text" && <TextBatchTool />}
       {tab === "radix" && <RadixTool />}
       {tab === "b64" && <FileB64Tool />}
+      {tab === "conf" && <ConfTool />}
     </div>
   );
 }

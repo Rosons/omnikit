@@ -3,6 +3,7 @@ import { tools, GROUPS, type ToolGroup } from "./tools/registry";
 import { ToastHost } from "./components/Toast";
 import { ConfirmHost } from "./components/ConfirmDialog";
 import Settings from "./tools/settings/Settings";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const COLLAPSE_KEY = "devtoolbox.sidebar.collapsed";
 
@@ -169,9 +170,11 @@ export default function App() {
           {showSettings ? (
             <Settings />
           ) : (
-            <Suspense fallback={<Loading />}>
-              <ActiveComponent />
-            </Suspense>
+            <ErrorBoundary key={activeId}>
+              <Suspense fallback={<Loading />}>
+                <ActiveComponent />
+              </Suspense>
+            </ErrorBoundary>
           )}
         </div>
       </main>

@@ -129,12 +129,28 @@ export const tools: ToolModule[] = [
     component: lazy(() => import("./color/ColorTool")),
   },
   {
+    id: "clip",
+    group: "misc" as ToolGroup,
+    name: "剪贴板",
+    desc: "复制历史与一键回贴",
+    icon: ClipboardIcon,
+    component: lazy(() => import("./clip/ClipTool")),
+  },
+  {
     id: "disk",
     group: "file" as ToolGroup,
     name: "磁盘分析",
     desc: "重复文件查找与目录大小",
     icon: DiskIcon,
     component: lazy(() => import("./disk/DiskTool")),
+  },
+  {
+    id: "fsearch",
+    group: "file" as ToolGroup,
+    name: "文件搜索",
+    desc: "全盘索引，文件名秒搜",
+    icon: SearchIcon,
+    component: lazy(() => import("./fsearch/FileSearchTool")),
   },
   {
     id: "monitor",
@@ -377,6 +393,30 @@ function LogIcon({ size = 16 }: { size?: number }) {
         <path d="M9 10h7" />
         <path d="M9 13.5h7" />
         <path d="M9 17h4.5" />
+      </g>
+    </svg>
+  );
+}
+
+function SearchIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="10.5" cy="10.5" r="6.5" fill="#9fcdfb" />
+      <circle cx="10.5" cy="10.5" r="6.5" stroke="#06a7ff" strokeWidth="2" fill="none" />
+      <path d="M15.5 15.5L20.5 20.5" stroke="#06a7ff" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ClipboardIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="5" y="4" width="14" height="18" rx="2.5" fill="#9fcdfb" />
+      <rect x="8.5" y="2.5" width="7" height="4" rx="1.5" fill="#06a7ff" />
+      <g stroke="#06a7ff" strokeWidth="1.7" strokeLinecap="round">
+        <path d="M8.5 11h7" />
+        <path d="M8.5 14.5h7" />
+        <path d="M8.5 18h4.5" />
       </g>
     </svg>
   );

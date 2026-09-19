@@ -19,6 +19,7 @@ pub struct WindowGeom {
 pub struct AppSettings {
     pub close_to_tray: bool,
     pub remember_window: bool,
+    pub hotkey_enabled: bool,
     pub window: Option<WindowGeom>,
 }
 
@@ -27,6 +28,7 @@ impl Default for AppSettings {
         Self {
             close_to_tray: false,
             remember_window: true,
+            hotkey_enabled: true,
             window: None,
         }
     }
@@ -72,6 +74,7 @@ pub fn settings_set(
     app: AppHandle,
     close_to_tray: Option<bool>,
     remember_window: Option<bool>,
+    hotkey_enabled: Option<bool>,
 ) -> Result<(), String> {
     let mut s = state.0.lock().unwrap().clone();
     if let Some(v) = close_to_tray {
@@ -79,6 +82,15 @@ pub fn settings_set(
     }
     if let Some(v) = remember_window {
         s.remember_window = v;
+    }
+    if let Some(v) = hotkey_enabled {
+        s.hotkey_enabled = v;
+        if v {
+            let _ = crate::register_hotkey(&app);
+        } else {
+            use tauri_plugin_global_shortcut::GlobalShortcutExt;
+            let _ = app.global_shortcut().unregister("Alt+Q");
+        }
     }
     save(&app, &s);
     *state.0.lock().unwrap() = s;

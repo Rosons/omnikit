@@ -9,6 +9,7 @@ import Dropdown from "../../components/Dropdown";
 interface AppSettings {
   close_to_tray: boolean;
   remember_window: boolean;
+  hotkey_enabled: boolean;
 }
 
 const START_PAGE_KEY = "devtoolbox.startPage";
@@ -17,6 +18,7 @@ export default function Settings() {
   const [closeToTray, setCloseToTray] = useState(false);
   const [rememberWin, setRememberWin] = useState(true);
   const [autoStart, setAutoStart] = useState(false);
+  const [hotkey, setHotkey] = useState(true);
   const [startPage, setStartPage] = useState(localStorage.getItem(START_PAGE_KEY) ?? "last");
 
   useEffect(() => {
@@ -24,6 +26,7 @@ export default function Settings() {
       .then((s) => {
         setCloseToTray(s.close_to_tray);
         setRememberWin(s.remember_window);
+        setHotkey(s.hotkey_enabled);
       })
       .catch(() => {});
     isEnabled()
@@ -56,6 +59,15 @@ export default function Settings() {
       setAutoStart(v);
     } catch (e) {
       showToast(String(e), "error", 5000);
+    }
+  }
+
+  async function setHotkeyRun(v: boolean) {
+    setHotkey(v);
+    try {
+      await invoke("settings_set", { hotkeyEnabled: v });
+    } catch (e) {
+      showToast(String(e), "error");
     }
   }
 
@@ -95,6 +107,21 @@ export default function Settings() {
               写入当前用户的启动项，仅对当前账户生效
             </span>
             <Switch on={autoStart} onChange={setAuto} />
+          </div>
+        </div>
+      </div>
+
+      <div className="field">
+        <span className="field-label">快捷键</span>
+        <div className="kv-list">
+          <div className="kv-row">
+            <span className="kv-k" style={{ minWidth: 170 }}>
+              全局快捷键唤起窗口
+            </span>
+            <span className="hint" style={{ flex: 1 }}>
+              在任何应用里按 Alt+Q，随时显示或隐藏 DevToolbox
+            </span>
+            <Switch on={hotkey} onChange={setHotkeyRun} />
           </div>
         </div>
       </div>

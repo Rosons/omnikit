@@ -234,6 +234,35 @@ body {
 .dd-item.sel { color: var(--primary); font-weight: 600; }
 .dd-item svg { flex: none; }
 
+/* ===== 剪贴板 ===== */
+.clip-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-1);
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: Consolas, "Cascadia Mono", monospace;
+}
+.clip-thumb {
+  flex: none;
+  max-height: 56px;
+  max-width: 96px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  object-fit: contain;
+}
+.clip-row .btn-text { flex: none; }
+
+/* ===== 文件搜索 ===== */
+.fs-list { max-height: calc(100vh - 430px); min-height: 160px; }
+.fs-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tool-item {
   display: flex;
   align-items: center;

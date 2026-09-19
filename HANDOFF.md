@@ -215,6 +215,14 @@ devtoolbox/
 - **数据工具箱扩到 11 个子 Tab**(新增 URL/批处理/进制/Base64;组件在 `src/tools/devtools/more.tsx` 独立模块,DevTools.tsx 引入):URL 解析(new URL+searchParams 自动解码,组成部分与查询参数逐项复制)、文本批处理(去重/排序/反转/去空行/Trim/大小写/全角转半角,点按即生效+20 步撤销)、进制换算(BigInt,2/8/10/16 互转,合法字符校验)、文件转 Base64(Rust `read_file_base64` 上限 16MB,输出纯 Base64 与 data URI,按扩展名映射 MIME)
 - `.seg` 加 flex-wrap(11 个子 Tab 需换行);**教训:长内容严禁 bash heredoc 直写文件(两次被截断损坏,改用 Write 工具或脚本文件)**
 - **新功能必须有用途说明**(用户要求):四个新子页(URL/批处理/进制/Base64)标题下补了 `.hint` 用途一句话;数据工具箱 desc 更新为列全部子项;**今后新增工具/子页,输入区上方或下方必须有一句「这是干啥的」**
+
+### v0.8.0 剪贴板历史/全盘搜索/全局快捷键/错误边界/配置转换(2026-09-19)
+- **错误边界**:`src/components/ErrorBoundary.tsx`(class 组件),App.tsx 里 `key={activeId}` 包裹懒加载工具页——单页崩溃只降级当前页(提示+重试),不再整站白屏;此前文本对比/端口页各白屏过一次
+- **剪贴板历史**(id `clip`,常用工具组):Rust `clip.rs` + **arboard 3** 后台线程每秒轮询;文本(≤1MB)与图片(RGBA→**png 0.17** 编码,≤16MP)都记录;fnv 哈希去重+回贴自抑制(clip_write 后主动更新 last_hash);**只存内存(500 条)不落盘**;前端轮询 1.5s,搜索过滤,图片缩略图,「回贴」写回剪贴板;暂停 Switch;清空带确认;hint 提示隐私(含密码也会记录)
+- **全局快捷键**:**tauri-plugin-global-shortcut**(Rust 侧注册,无需 capability);`register_hotkey` Alt+Q 显示/隐藏主窗口;settings 加 `hotkey_enabled`(默认开),设置页 Switch 动态注册/注销;lib.rs 插件初始化用 `Builder::new().build()`
+- **文件搜索**(id `fsearch`,文件工具组,Everything 式):`search.rs` 后台线程 walkdir 遍历选定磁盘(`filter_entry` 按排除关键字剪枝,默认 node_modules 等,可编辑存 localStorage),进度事件 `idx://progress`;索引存内存 `Arc<Vec<Box<str>>>`(读写锁换 Arc 零成本读),完成后 **flate2 gz 压缩缓存**到 appdata,下次启动工具页自动加载;查询小写子串匹配、300 条截断;结果行复制+「位置」;磁盘选择胶囊(sys_overview 的挂载点)
+- **配置转换**(数据工具箱子 Tab「配置」,js-yaml):YAML→JSON、JSON→YAML、properties→YAML、YAML→properties 四向;properties 点号键按层级拆解/合并(unflatten/flatten),注释(# !)与 =/: 分隔符支持
+- 侧边栏现为 **4 组 18 个工具**;新图标 SearchIcon/ClipboardIcon;教训:python 补丁里 `\\n` 经 heredoc 传递会变真换行(已两次),转义类内容一律 Write 脚本文件;registry 补丁注意 anchor 自带尾逗号导致的数组空洞
 - 设置页开关用 `Switch` 组件(`src/components/Switch.tsx`),下拉用 `Dropdown` 组件(`src/components/Dropdown.tsx`,菜单 fixed 定位防 kv-list overflow 裁剪,菜单内滚动不关闭、页面滚动才收起、贴底自动上弹)
 
 ### 剩余手动验收(需真人操作)

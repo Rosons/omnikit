@@ -1,3 +1,4 @@
+mod clip;
 mod commands;
 mod crypto;
 mod error;
@@ -5,15 +6,36 @@ mod format;
 mod history;
 mod mcp;
 mod pack;
+mod search;
 mod settings;
 mod unpack;
 
 use settings::SettingsState;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Manager, RunEvent};
+use tauri::{AppHandle, Manager, RunEvent};
 
+use clip::ClipState;
 use mcp::McpState;
+use search::SearchState;
+
+/// 注册 Alt+Q 全局快捷键:按一下显示或隐藏主窗口
+pub(crate) fn register_hotkey(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+    let r = app.global_shortcut().on_shortcut("Alt+Q", |app, _sc, event| {
+        if event.state() == ShortcutState::Pressed {
+            if let Some(w) = app.get_webview_window("main") {
+                if w.is_visible().unwrap_or(false) {
+                    let _ = w.hide();
+                } else {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
+            }
+        }
+    });
+    Ok(r?)
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,9 +45,12 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(commands::AppState::default())
-        .manage(mcp::McpState::default())
+        .manage(McpState::default())
         .manage(commands::TailState::default())
+        .manage(ClipState::default())
+        .manage(SearchState::default())
         .invoke_handler(tauri::generate_handler![
             commands::sb_encrypt,
             commands::sb_decrypt,
@@ -55,6 +80,15 @@ pub fn run() {
             commands::read_file_base64,
             settings::settings_get,
             settings::settings_set,
+            clip::clip_list,
+            clip::clip_set_paused,
+            clip::clip_write,
+            clip::clip_clear,
+            search::search_start,
+            search::search_stop,
+            search::search_status,
+            search::search_cache_load,
+            search::search_query,
             mcp::mcp_connect,
             mcp::mcp_disconnect,
             mcp::mcp_list_tools,
@@ -92,6 +126,15 @@ pub fn run() {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.show();
             }
+
+            // 全局快捷键
+            if s.hotkey_enabled {
+                let _ = register_hotkey(app.handle());
+            }
+
+            // 剪贴板后台监听
+            let monitor_handle = app.handle().clone();
+            std::thread::spawn(move || clip::clip_monitor(monitor_handle));
 
             // 系统托盘:左键恢复窗口,右键菜单
             let show = MenuItem::with_id(app, "show", "显示 DevToolbox", true, None::<&str>)?;
@@ -133,7 +176,7 @@ pub fn run() {
         .expect("DevToolbox 启动失败")
         .run(|app, event| {
             if let RunEvent::Exit = event {
-                // 退出时保存窗口几何并结束 MCP 子进程
+                // 退出时保存窗口几何并清理后台会话
                 let st = app.state::<SettingsState>();
                 let remember = st.0.lock().unwrap().remember_window;
                 if remember {

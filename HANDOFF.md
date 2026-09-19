@@ -188,6 +188,14 @@ devtoolbox/
 - 侧边栏现为 4 组 13 个工具;新图标 GaugeIcon 仪表盘
 - **SQL 语法高亮**(用户要求):prismjs(仅引入 SQL 语法组件)对格式化结果高亮展示——关键词蓝加粗/字符串绿/函数紫/数字橙/注释灰斜体(`.sql-out .token.*`);复制按钮复制的仍是纯文本;结果区从 textarea 改为可滚动 pre 容器
 
+### v0.5.0 MCP 测试(2026-09-19)
+- **新工具「MCP 测试」**(id `mcp`,开发工具组,`src/tools/mcp/McpTool.tsx` + `src-tauri/src/mcp.rs` 独立模块,侧边栏现为 4 组 14 个工具):
+  - **双传输**:stdio(本地命令,支持引号分词 `split_command_line`,CREATE_NO_WINDOW 隐藏窗口,后台线程读 stdout 按行解析 JSON-RPC、stderr 进日志)与 Streamable HTTP(POST JSON-RPC,Accept 同时带 json 与 event-stream,自动维护 `Mcp-Session-Id`,响应可为 JSON 或 SSE,自定义请求头给鉴权);旧版 HTTP+SSE(2024-11-05 GET /sse)传输未做
+  - JSON-RPC 手写实现(顺序请求+id 匹配+30s 超时):initialize(协议版本 2025-06-18,clientInfo DevToolbox)→ notifications/initialized → tools/list、tools/call、resources/list、prompts/list;收发消息全记日志(上限 200 条,单条截断 2000 字)
+  - Rust:`McpState(Mutex<Option<Arc<McpSession>>>)` 独立 manage;stdio 会话 Drop 杀子进程;**lib.rs 从 `.run(ctx)` 改为 `.build(ctx).run(callback)`,RunEvent::Exit 时清掉 McpState 结束残留子进程**;hidden_command 改 pub(crate) 供 mcp.rs 复用
+  - 前端:连接卡片(stdio/http 切换+目标输入+http 请求头行)→ 连接后服务器信息 chips(名称版本/协议版本/能力中文标签)+ instructions 提示条 → 工具列表(名称/描述/调用按钮,选中高亮)→ 调用区(Schema 可折叠 pre、**按 JSON Schema 自动生成参数模板**——只填必填项无必填填全部、enum 取第一个、default 优先)→ 结果(成功/失败 chip+耗时、文本内容、原始 JSON 切换、复制);资源/提示列表;JSON-RPC 日志折叠面板;断开/退出清理
+- 已知边界:tools/resources 分页游标未处理(取第一页);服务端主动请求(采样/根目录)仅记日志不响应;子进程孙进程(如 npx→node)不保证级联结束
+
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)
 

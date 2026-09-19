@@ -81,6 +81,14 @@ export const tools: ToolModule[] = [
     component: lazy(() => import("./http/HttpTool")),
   },
   {
+    id: "mcp",
+    group: "dev" as ToolGroup,
+    name: "MCP 测试",
+    desc: "连接 MCP 服务器，调试工具调用",
+    icon: PlugIcon,
+    component: lazy(() => import("./mcp/McpTool")),
+  },
+  {
     id: "regex",
     group: "dev" as ToolGroup,
     name: "正则测试",
@@ -313,6 +321,17 @@ function GaugeIcon({ size = 16 }: { size?: number }) {
       <path d="M12 15.5L16 9.5" stroke="#06a7ff" strokeWidth="2.2" strokeLinecap="round" />
       <circle cx="12" cy="15.5" r="1.8" fill="#06a7ff" />
       <rect x="3" y="17.5" width="18" height="2.4" rx="1.2" fill="#06a7ff" />
+    </svg>
+  );
+}
+
+function PlugIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="8.6" y="2.5" width="2.4" height="6" rx="1.2" fill="#9fcdfb" />
+      <rect x="13" y="2.5" width="2.4" height="6" rx="1.2" fill="#9fcdfb" />
+      <path d="M7 7.5h10v4a5 5 0 0 1-5 5 5 5 0 0 1-5-5z" fill="#06a7ff" />
+      <rect x="10.8" y="14" width="2.4" height="7.5" rx="1.2" fill="#06a7ff" />
     </svg>
   );
 }

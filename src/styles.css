@@ -1649,6 +1649,67 @@ body {
 .sql-out .token.operator,
 .sql-out .token.punctuation { color: var(--text-2); }
 
+/* ===== MCP 测试 ===== */
+.mcp-desc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+.kv-row.mcp-sel { background: var(--primary-dim); }
+.mcp-inline { display: inline; margin-left: 10px; font-weight: 400; }
+.mcp-inline summary {
+  display: inline;
+  cursor: pointer;
+  color: var(--primary);
+  font-size: 12px;
+  list-style: none;
+}
+.mcp-inline summary::-webkit-details-marker { display: none; }
+.mcp-inline[open] summary::after { content: " ▲"; }
+.mcp-inline:not([open]) summary::after { content: " ▼"; }
+.mcp-inline pre {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  max-height: 200px;
+  overflow: auto;
+  background: var(--fill);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+details.mcp-log {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--card);
+}
+details.mcp-log summary {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+details.mcp-log pre {
+  margin: 0;
+  padding: 0 12px 10px;
+  max-height: 260px;
+  overflow: auto;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* 紧凑控件(密码生成/Cron 生成器的数字输入与小按钮) */
 .input-sm { height: 28px; }
 .btn-sm { height: 28px; padding: 0 16px; font-size: 12.5px; }

@@ -43,8 +43,8 @@ export const tools: ToolModule[] = [
   {
     id: "devtools",
     group: "dev" as ToolGroup,
-    name: "开发小工具",
-    desc: "JSON / 时间戳 / 编解码 / UUID / 哈希",
+    name: "数据工具箱",
+    desc: "JSON / 时间戳 / 编解码 / UUID / 哈希 / JWT / SQL",
     icon: WrenchIcon,
     component: lazy(() => import("./devtools/DevTools")),
   },

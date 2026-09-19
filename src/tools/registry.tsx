@@ -5,10 +5,19 @@ import { lazy } from "react";
  * 工具模块注册表 —— 未来新工具只需在 tools 数组里加一条,
  * 侧边栏与路由自动生成,无需改动 App。
  */
+export type ToolGroup = "file" | "dev" | "misc";
+
+export const GROUPS: { id: ToolGroup; name: string }[] = [
+  { id: "file", name: "文件工具" },
+  { id: "dev", name: "开发工具" },
+  { id: "misc", name: "常用工具" },
+];
+
 export interface ToolModule {
   id: string;
   name: string;
   desc: string;
+  group: ToolGroup;
   icon: ComponentType<{ size?: number }>;
   component: LazyExoticComponent<ComponentType>;
 }
@@ -16,6 +25,7 @@ export interface ToolModule {
 export const tools: ToolModule[] = [
   {
     id: "safebox",
+    group: "file" as ToolGroup,
     name: "文件保险箱",
     desc: "打包加密成 .box，凭密码还原",
     icon: LockIcon,
@@ -23,6 +33,7 @@ export const tools: ToolModule[] = [
   },
   {
     id: "filemgr",
+    group: "file" as ToolGroup,
     name: "文件管理",
     desc: "加密与解密过的文件记录",
     icon: FolderToolIcon,
@@ -30,6 +41,7 @@ export const tools: ToolModule[] = [
   },
   {
     id: "devtools",
+    group: "dev" as ToolGroup,
     name: "开发小工具",
     desc: "JSON / 时间戳 / 编解码 / UUID / 哈希",
     icon: WrenchIcon,
@@ -37,6 +49,7 @@ export const tools: ToolModule[] = [
   },
   {
     id: "qr",
+    group: "misc" as ToolGroup,
     name: "二维码",
     desc: "生成与识别二维码，全程本机处理",
     icon: QrIcon,
@@ -44,6 +57,7 @@ export const tools: ToolModule[] = [
   },
   {
     id: "diff",
+    group: "dev" as ToolGroup,
     name: "文本对比",
     desc: "两段文本或文件逐行差异",
     icon: DiffIcon,
@@ -51,6 +65,7 @@ export const tools: ToolModule[] = [
   },
   {
     id: "port",
+    group: "dev" as ToolGroup,
     name: "端口占用",
     desc: "查看监听端口并结束进程",
     icon: PortIcon,
@@ -58,6 +73,7 @@ export const tools: ToolModule[] = [
   },
   {
     id: "http",
+    group: "dev" as ToolGroup,
     name: "HTTP 测试",
     desc: "本地发起请求，查看响应",
     icon: HttpIcon,
@@ -65,6 +81,7 @@ export const tools: ToolModule[] = [
   },
   {
     id: "regex",
+    group: "dev" as ToolGroup,
     name: "正则测试",
     desc: "实时匹配高亮与分组解析",
     icon: RegexIcon,
@@ -72,6 +89,7 @@ export const tools: ToolModule[] = [
   },
   {
     id: "cron",
+    group: "dev" as ToolGroup,
     name: "Cron 表达式",
     desc: "定时表达式解析与生成",
     icon: ClockIcon,
@@ -79,6 +97,7 @@ export const tools: ToolModule[] = [
   },
   {
     id: "pwgen",
+    group: "misc" as ToolGroup,
     name: "密码生成",
     desc: "随机强密码批量生成",
     icon: KeyIcon,
@@ -86,6 +105,7 @@ export const tools: ToolModule[] = [
   },
   {
     id: "color",
+    group: "misc" as ToolGroup,
     name: "颜色工具",
     desc: "HEX 与 RGB、HSL 互转",
     icon: ColorIcon,
@@ -93,6 +113,7 @@ export const tools: ToolModule[] = [
   },
   {
     id: "disk",
+    group: "file" as ToolGroup,
     name: "磁盘分析",
     desc: "重复文件查找与目录大小",
     icon: DiskIcon,

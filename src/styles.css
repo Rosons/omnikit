@@ -98,7 +98,36 @@ body {
 .brand-name { font-size: 15px; font-weight: 700; }
 .brand-sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
 
-.tool-list { display: flex; flex-direction: column; gap: 2px; }
+.tool-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* 侧边栏分组 */
+.tool-group { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px 4px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--text-3);
+  border-radius: var(--radius-s);
+  transition: var(--fast);
+}
+.group-head:hover { color: var(--text-2); background: var(--fill-2); }
+.group-head svg { transition: transform var(--fast); }
+.group-head:not(.open) svg { transform: rotate(-90deg); }
 
 .tool-item {
   display: flex;

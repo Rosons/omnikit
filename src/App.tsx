@@ -1,13 +1,43 @@
 import { Suspense, useEffect, useState } from "react";
-import { tools } from "./tools/registry";
+import { tools, GROUPS, type ToolGroup } from "./tools/registry";
 import { ToastHost } from "./components/Toast";
 import { ConfirmHost } from "./components/ConfirmDialog";
+
+const COLLAPSE_KEY = "devtoolbox.sidebar.collapsed";
+
+function loadCollapsed(): Set<ToolGroup> {
+  try {
+    const raw = localStorage.getItem(COLLAPSE_KEY);
+    return raw ? new Set(JSON.parse(raw) as ToolGroup[]) : new Set();
+  } catch {
+    return new Set();
+  }
+}
 
 export default function App() {
   const [activeId, setActiveId] = useState(tools[0].id);
   const active = tools.find((t) => t.id === activeId) ?? tools[0];
   const ActiveIcon = active.icon;
   const ActiveComponent = active.component;
+  const [collapsed, setCollapsed] = useState<Set<ToolGroup>>(loadCollapsed);
+
+  // 折叠状态持久化
+  useEffect(() => {
+    localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...collapsed]));
+  }, [collapsed]);
+
+  // 切换到某工具时,自动展开其所在分组
+  useEffect(() => {
+    const t = tools.find((x) => x.id === activeId);
+    if (t) {
+      setCollapsed((s) => {
+        if (!s.has(t.group)) return s;
+        const n = new Set(s);
+        n.delete(t.group);
+        return n;
+      });
+    }
+  }, [activeId]);
 
   // 其他页面可发起切换(如文件管理 → 去解密)
   useEffect(() => {
@@ -18,6 +48,15 @@ export default function App() {
     window.addEventListener("devtoolbox:navigate", handler);
     return () => window.removeEventListener("devtoolbox:navigate", handler);
   }, []);
+
+  function toggleGroup(g: ToolGroup) {
+    setCollapsed((s) => {
+      const n = new Set(s);
+      if (n.has(g)) n.delete(g);
+      else n.add(g);
+      return n;
+    });
+  }
 
   return (
     <div className="app">
@@ -43,19 +82,44 @@ export default function App() {
         </div>
 
         <nav className="tool-list">
-          {tools.map((tool) => {
-            const Icon = tool.icon;
+          {GROUPS.map((g) => {
+            const items = tools.filter((t) => t.group === g.id);
+            const isCollapsed = collapsed.has(g.id);
             return (
-              <button
-                key={tool.id}
-                className={`tool-item${tool.id === activeId ? " active" : ""}`}
-                onClick={() => setActiveId(tool.id)}
-              >
-                <span className="tool-icon">
-                  <Icon size={15} />
-                </span>
-                <span className="tool-name">{tool.name}</span>
-              </button>
+              <div className="tool-group" key={g.id}>
+                <button
+                  className={`group-head${isCollapsed ? "" : " open"}`}
+                  onClick={() => toggleGroup(g.id)}
+                  title={isCollapsed ? "展开分组" : "折叠分组"}
+                >
+                  <span>{g.name}</span>
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+                    <path
+                      d="M2 3.5L5 6.5L8 3.5"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+                {!isCollapsed &&
+                  items.map((tool) => {
+                    const Icon = tool.icon;
+                    return (
+                      <button
+                        key={tool.id}
+                        className={`tool-item${tool.id === activeId ? " active" : ""}`}
+                        onClick={() => setActiveId(tool.id)}
+                      >
+                        <span className="tool-icon">
+                          <Icon size={15} />
+                        </span>
+                        <span className="tool-name">{tool.name}</span>
+                      </button>
+                    );
+                  })}
+              </div>
             );
           })}
         </nav>

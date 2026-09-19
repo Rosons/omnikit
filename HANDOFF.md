@@ -173,6 +173,13 @@ devtoolbox/
 - **确认弹窗应用内化**(用户反馈原生框风格突兀):`src/components/ConfirmDialog.tsx` 提供 `showConfirm(opts)`(Promise 布尔)+ `<ConfirmHost />` 挂在 App;应用风格遮罩弹窗,支持 danger 红色确认按钮(删除/结束进程用)、回车确认、Esc/点遮罩取消;替换了端口结束进程与磁盘两处原生 confirm
 - **控件高度体系**:标准 36(input/btn)、紧凑 28(input-sm/btn-sm/btn-chip/工具栏内 opt-chip);铁律是**同一行内控件必须同高**——磁盘分析工具栏用户嫌扁改回全尺寸 36,端口/HTTP/连通测试工具栏保持 28 紧凑;新增工具栏行时任选一档但行内统一
 
+### v0.3.1 侧边栏分组(2026-09-19,方案 B)
+- 12 个工具已到单列侧边栏上限,按用户确认的**方案 B(侧边栏分组,非顶部模块)**改造:
+  - `registry.tsx`:`ToolModule` 增加 `group: ToolGroup`(file/dev/misc),导出 `GROUPS`(文件工具/开发工具/常用工具);**新工具注册时必须填 group**
+  - App.tsx:侧边栏按组渲染,组头可点击折叠(chevron 旋转);折叠状态存 localStorage(`devtoolbox.sidebar.collapsed`);切换到某工具时自动展开其所在分组
+  - 样式:`.tool-group/.group-head`;`.tool-list` 改为可滚动(flex:1 + overflow-y)
+  - 后续工具超约 18 个时,可升级为方案 A(顶部模块 + 每模块左侧菜单),分组数据同一套,迁移无废功
+
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)
 

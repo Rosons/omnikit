@@ -25,6 +25,7 @@ export default function FileSearchTool() {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<string[] | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
+  const [progress, setProgress] = useState<{ files: number; pct: number | null } | null>(null);
   const rootsTouched = useRef(false);
   const qTimer = useRef<number | undefined>(undefined);
 
@@ -47,7 +48,25 @@ export default function FileSearchTool() {
       .then((r) => setDisks(r.disks))
       .catch(() => {});
     invoke("search_cache_load").catch(() => {});
-    const un = listen<{ files: number }>("idx://progress", () => refreshStatus());
+    const un = listen<{
+      files: number;
+      phase?: string;
+      estimate?: number;
+    }>("idx://progress", (e) => {
+      const { files, phase, estimate } = e.payload;
+      if (phase === "done" || phase === "stopped") {
+        setProgress(null);
+      } else if (phase === "scanning") {
+        // 有上次索引数作基准:files/estimate 估算百分比(封顶 95%,完成时直接跳 100);
+        // 无基准:显示 null,进度条走流动动画
+        const pct =
+          estimate && estimate > 0
+            ? Math.min(95, Math.round((files / estimate) * 100))
+            : null;
+        setProgress({ files, pct });
+      }
+      refreshStatus();
+    });
     return () => {
       un.then((fn) => fn());
     };
@@ -170,6 +189,21 @@ export default function FileSearchTool() {
               </button>
             )}
           </div>
+          {status?.indexing && progress && (
+            <div className="idx-progress">
+              <div className="idx-bar">
+                <div
+                  className={progress.pct === null ? " flowing" : ""}
+                  style={{ width: progress.pct === null ? "40%" : `${progress.pct}%` }}
+                />
+              </div>
+              <span className="hint idx-count">
+                {progress.pct === null
+                  ? `${progress.files.toLocaleString()} 个文件`
+                  : `${progress.pct}% · ${progress.files.toLocaleString()} 个文件`}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

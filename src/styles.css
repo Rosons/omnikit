@@ -258,6 +258,35 @@ body {
 /* ===== 文件搜索 ===== */
 .fsearch-page { min-height: 320px; }
 .fs-input { flex: none; }
+/* 索引进度条 */
+.idx-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.idx-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--fill-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.idx-bar > div {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 300ms var(--ease);
+}
+/* 无估算基准时的流动动画 */
+.idx-bar > div.flowing {
+  animation: idx-flow 1.4s var(--ease) infinite;
+}
+@keyframes idx-flow {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+.idx-count { flex: none; min-width: 130px; text-align: right; font-variant-numeric: tabular-nums; }
+
 .fs-status {
   flex: none;
   display: flex;

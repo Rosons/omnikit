@@ -161,11 +161,24 @@ fn index_worker(
                 }
             }
             vec.push(lossy.to_string().into_boxed_str());
-            if last_emit.elapsed().as_millis() >= 400 {
+            if last_emit.elapsed().as_millis() >= 300 {
                 last_emit = Instant::now();
+                let last_files = app
+                    .state::<SearchState>()
+                    .meta
+                    .lock()
+                    .unwrap()
+                    .as_ref()
+                    .map(|m| m.files)
+                    .unwrap_or(0);
                 let _ = app.emit(
                     "idx://progress",
-                    serde_json::json!({ "files": vec.len(), "current": root }),
+                    serde_json::json!({
+                        "files": vec.len(),
+                        "current": root,
+                        "phase": "scanning",
+                        "estimate": last_files
+                    }),
                 );
             }
         }
@@ -184,7 +197,11 @@ fn index_worker(
     let files = state.paths.read().unwrap().len();
     let _ = app.emit(
         "idx://progress",
-        serde_json::json!({ "files": files, "current": "" }),
+        serde_json::json!({ 
+            "files": files,
+            "current": "",
+            "phase": if stopped { "stopped" } else { "done" },
+        }),
     );
     if !stopped && files > 0 {
         let paths = state.paths.read().unwrap();

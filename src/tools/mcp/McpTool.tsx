@@ -323,7 +323,18 @@ export default function McpTool() {
           <span className="field-label">
             调用「{sel.name}」
             <details className="mcp-inline">
-              <summary>参数 Schema</summary>
+              <summary>
+                参数 Schema
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+                  <path
+                    d="M2 3.5L5 6.5L8 3.5"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </summary>
               <pre>{schemaText || "（无）"}</pre>
             </details>
           </span>

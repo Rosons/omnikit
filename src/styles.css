@@ -1658,15 +1658,17 @@ body {
 .kv-row.mcp-sel { background: var(--primary-dim); }
 .mcp-inline { display: inline; margin-left: 10px; font-weight: 400; }
 .mcp-inline summary {
-  display: inline;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   cursor: pointer;
   color: var(--primary);
   font-size: 12px;
   list-style: none;
 }
 .mcp-inline summary::-webkit-details-marker { display: none; }
-.mcp-inline[open] summary::after { content: " ▲"; }
-.mcp-inline:not([open]) summary::after { content: " ▼"; }
+.mcp-inline summary svg { transition: transform var(--fast); }
+.mcp-inline[open] summary svg { transform: rotate(180deg); }
 .mcp-inline pre {
   margin: 8px 0 0;
   padding: 8px 10px;

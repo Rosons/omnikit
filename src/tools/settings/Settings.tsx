@@ -210,10 +210,10 @@ export default function Settings() {
         <div className="kv-list">
           <div className="kv-row">
             <span className="kv-k" style={{ minWidth: 170 }}>
-              DevToolbox
+              OmniKit
             </span>
             <span className="hint">
-              v0.8.0 · 开发者个人工具箱 · 全部功能本地处理，数据不出设备
+              v0.8.0 · 个人百宝工具箱 · 全部功能本地处理，数据不出设备
             </span>
           </div>
         </div>

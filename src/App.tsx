@@ -83,19 +83,18 @@ export default function App() {
           <div className="brand-mark">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path
-                d="M9 8.5V7a3 3 0 0 1 3-3h.5a3 3 0 0 1 3 3v1.5"
-                stroke="#9fcdfb"
-                strokeWidth="2"
+                d="M6.5 7L12 11.6L6.5 16.2"
+                stroke="#ffffff"
+                strokeWidth="2.7"
                 strokeLinecap="round"
+                strokeLinejoin="round"
               />
-              <rect x="3" y="8.5" width="18" height="12" rx="2.5" fill="#06a7ff" />
-              <rect x="3" y="13.2" width="18" height="2" fill="#e8f6ff" />
-              <rect x="10.2" y="12" width="3.6" height="4.4" rx="1" fill="#e8f6ff" />
+              <rect x="13.6" y="14.8" width="6.4" height="2.7" rx="1.35" fill="#ffffff" />
             </svg>
           </div>
           <div>
-            <div className="brand-name">DevToolbox</div>
-            <div className="brand-sub">开发者个人工具箱</div>
+            <div className="brand-name">OmniKit</div>
+            <div className="brand-sub">个人百宝工具箱</div>
           </div>
         </div>
 
@@ -156,7 +155,7 @@ export default function App() {
             <span className="tool-name">设置</span>
           </button>
         </div>
-        <div className="sidebar-footer">v0.8.0 · 本地处理，数据不出设备</div>
+        <div className="sidebar-footer">OmniKit v0.8.0 · 本地处理，数据不出设备</div>
       </aside>
 
       <main className="main">

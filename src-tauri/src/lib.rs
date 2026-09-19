@@ -153,12 +153,12 @@ pub fn run() {
             std::thread::spawn(move || clip::clip_monitor(monitor_handle));
 
             // 系统托盘:左键恢复窗口,右键菜单
-            let show = MenuItem::with_id(app, "show", "显示 DevToolbox", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "显示 OmniKit", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &quit])?;
             TrayIconBuilder::with_id("main-tray")
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("DevToolbox")
+                .tooltip("OmniKit")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
@@ -189,7 +189,7 @@ pub fn run() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("DevToolbox 启动失败")
+        .expect("OmniKit 启动失败")
         .run(|app, event| {
             if let RunEvent::Exit = event {
                 // 退出时保存窗口几何并清理后台会话

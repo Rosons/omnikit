@@ -51,9 +51,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: OmniKit-macos
-          path: |
-            target/release/bundle/dmg/*.dmg
-            target/release/bundle/macos/*.app
+          # 只上传 dmg 本体;.app 目录会让 artifact 以 bundle/ 为根,且内部文件本就不发布
+          path: target/release/bundle/dmg/*.dmg
           if-no-files-found: error
 
   # 两个平台都构建成功后,自动创建 Release 并附上全部安装包
@@ -70,8 +69,8 @@ jobs:
           path: dist
       - uses: softprops/action-gh-release@v2
         with:
-          # 只发布安装包本体,过滤 .app 包解压出的内部文件
+          # 只发布安装包本体;** 兼容 artifact 解包后的子目录层级
           files: |
-            dist/*.exe
-            dist/*.dmg
+            dist/**/*.exe
+            dist/**/*.dmg
           fail_on_unmatched_files: true

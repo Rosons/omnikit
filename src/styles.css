@@ -2167,6 +2167,31 @@ details.mcp-log pre {
 
 /* 剪贴板置顶标记 */
 .clip-pin.on { color: #f59e0b; font-weight: 500; }
+/* 图片缩略图可点击预览;单条删除悬停变红 */
+.clip-thumb.clickable { cursor: pointer; transition: border-color var(--fast); }
+.clip-thumb.clickable:hover { border-color: var(--primary); }
+.clip-del:hover:not(:disabled) { color: var(--danger); background: var(--danger-dim); }
+/* 剪贴板图片预览弹窗(底衬白,透明 PNG 才看得清) */
+.clip-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+  max-width: calc(100vw - 64px);
+  background: var(--card);
+  border-radius: var(--radius-l);
+  box-shadow: 0 18px 48px rgba(31, 35, 41, 0.22);
+  animation: modal-in 160ms var(--ease);
+}
+.clip-modal img {
+  max-width: min(720px, 84vw);
+  max-height: 66vh;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: #ffffff;
+}
 
 /* 日志级别着色 */
 .log-lv-err { color: var(--log-err); }

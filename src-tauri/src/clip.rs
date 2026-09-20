@@ -386,6 +386,21 @@ pub fn clip_clear(state: tauri::State<'_, ClipState>, app: AppHandle) -> Result<
     Ok(())
 }
 
+/// 删除单条历史,开启落盘时立即同步写盘
+#[tauri::command]
+pub fn clip_remove(state: tauri::State<'_, ClipState>, app: AppHandle, id: u64) -> Result<(), String> {
+    {
+        let mut items = state.items.lock().unwrap();
+        items.retain(|i| i.id != id);
+    }
+    if state.persist.load(Ordering::Relaxed) {
+        save_now(&app);
+    } else {
+        state.dirty.store(false, Ordering::Relaxed);
+    }
+    Ok(())
+}
+
 /// 切换加密落盘:关闭时删除历史文件,开启时立即写一次盘
 #[tauri::command]
 pub fn clip_set_persist(state: tauri::State<'_, ClipState>, app: AppHandle, persist: bool) -> Result<(), String> {

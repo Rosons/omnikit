@@ -43,6 +43,7 @@ export default function ClipTool() {
   const [q, setQ] = useState("");
   const [pins, setPins] = useState<string[]>(loadPins);
   const [persist, setPersist] = useState(true);
+  const [preview, setPreview] = useState<ClipItem | null>(null);
 
   async function refresh() {
     try {
@@ -126,6 +127,15 @@ export default function ClipTool() {
     refresh();
   }
 
+  async function removeOne(it: ClipItem) {
+    try {
+      await invoke("clip_remove", { id: it.id });
+      refresh();
+    } catch (e) {
+      showToast(String(e), "error");
+    }
+  }
+
   return (
     <div className="stack">
       <div className="tool-actions">
@@ -175,9 +185,11 @@ export default function ClipTool() {
               <div className="kv-row clip-row" key={it.id}>
                 {it.kind === "image" && it.image_base64 ? (
                   <img
-                    className="clip-thumb"
+                    className="clip-thumb clickable"
                     src={`data:image/png;base64,${it.image_base64}`}
                     alt="剪贴板图片"
+                    title="点击预览大图"
+                    onClick={() => setPreview(it)}
                   />
                 ) : (
                   <span className="clip-text" title={it.text ?? ""}>
@@ -201,10 +213,37 @@ export default function ClipTool() {
                 <button className="btn-text" onClick={() => writeBack(it)}>
                   回贴
                 </button>
+                <button className="btn-text clip-del" onClick={() => removeOne(it)}>
+                  删除
+                </button>
               </div>
             );
           })}
       </div>
+      {preview && (
+        <div className="modal-mask open" onClick={() => setPreview(null)}>
+          <div className="clip-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="qr-modal-title">
+              剪贴板图片 · {preview.width}×{preview.height} · {fmtBytes(preview.bytes)}
+            </div>
+            <img src={`data:image/png;base64,${preview.image_base64 ?? ""}`} alt="剪贴板图片预览" />
+            <div className="tool-actions">
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => {
+                  writeBack(preview);
+                  setPreview(null);
+                }}
+              >
+                回贴
+              </button>
+              <button className="btn btn-sm" onClick={() => setPreview(null)}>
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="hint">
         最多 500 条；落盘开启时历史加密保存到本机（密钥存系统凭据库），重启不丢，关闭即删除文件。注意：复制过的内容（含密码）都会被记录，可随时暂停、关闭落盘或清空
       </div>

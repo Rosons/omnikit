@@ -98,6 +98,7 @@ pub fn run() {
             clip::clip_set_paused,
             clip::clip_set_persist,
             clip::clip_write,
+            clip::clip_remove,
             clip::clip_clear,
             search::search_start,
             search::search_stop,

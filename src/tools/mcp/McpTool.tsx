@@ -1,13 +1,39 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { showToast } from "../../components/Toast";
 import CopyButton from "../../components/CopyButton";
+import Dropdown from "../../components/Dropdown";
 
 const KINDS = [
   { id: "stdio", label: "本地命令" },
-  { id: "http", label: "远程 URL" },
+  { id: "http", label: "Streamable HTTP" },
+  { id: "sse", label: "HTTP+SSE 旧版" },
 ] as const;
 type Kind = (typeof KINDS)[number]["id"];
+
+const SERVERS_KEY = "omnikit.mcp.servers";
+
+interface SavedServer {
+  kind: Kind;
+  target: string;
+  headers: HeaderRow[];
+}
+
+function loadServers(): SavedServer[] {
+  try {
+    const arr = JSON.parse(localStorage.getItem(SERVERS_KEY) ?? "[]");
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 连接成功后自动记住服务器(同传输+同地址去重,最多 20 条) */
+function saveServer(s: SavedServer): SavedServer[] {
+  const list = [s, ...loadServers().filter((x) => !(x.kind === s.kind && x.target === s.target))].slice(0, 20);
+  localStorage.setItem(SERVERS_KEY, JSON.stringify(list));
+  return list;
+}
 
 interface McpInfo {
   protocol_version: string;
@@ -96,6 +122,18 @@ export default function McpTool() {
   const [result, setResult] = useState<McpCallResult | null>(null);
   const [showRaw, setShowRaw] = useState(false);
   const [log, setLog] = useState<string[]>([]);
+  const [servers, setServers] = useState<SavedServer[]>(loadServers);
+
+  useEffect(() => {
+    // 首次进入自动填上次用过的服务器
+    const s = loadServers()[0];
+    if (s && !target) {
+      setKind(s.kind);
+      setTarget(s.target);
+      setHeaders(s.headers ?? []);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function refreshLog() {
     try {
@@ -125,6 +163,7 @@ export default function McpTool() {
           .filter((h) => h.k.trim())
           .map((h) => [h.k.trim(), h.v.trim()] as [string, string]),
       });
+      setServers(saveServer({ kind, target: target.trim(), headers }));
       setInfo(nfo);
       if (nfo.capabilities.includes("工具")) {
         setTools(await invoke<McpTool[]>("mcp_list_tools"));
@@ -138,6 +177,12 @@ export default function McpTool() {
       refreshLog();
       showToast(`已连接 ${nfo.server_name}`, "success");
     } catch (e) {
+      // 连接失败落本地日志,带传输方式与目标,便于事后排查
+      invoke("log_append", {
+        level: "error",
+        source: "mcp",
+        message: `连接失败 ${kind} ${target.trim()}：${String(e)}`.slice(0, 600),
+      }).catch(() => {});
       showToast(String(e), "error", 6000);
       refreshLog();
     } finally {
@@ -181,6 +226,11 @@ export default function McpTool() {
       setResult(r);
       refreshLog();
     } catch (e) {
+      invoke("log_append", {
+        level: "warn",
+        source: "mcp",
+        message: `工具调用失败 ${sel.name}：${String(e)}`.slice(0, 500),
+      }).catch(() => {});
       showToast(String(e), "error", 6000);
       refreshLog();
     } finally {
@@ -213,7 +263,9 @@ export default function McpTool() {
             placeholder={
               kind === "stdio"
                 ? "如 npx -y @modelcontextprotocol/server-everything"
-                : "如 https://example.com/mcp"
+                : kind === "sse"
+                  ? "如 https://example.com/sse"
+                  : "如 https://example.com/mcp"
             }
             spellCheck={false}
           />
@@ -227,7 +279,41 @@ export default function McpTool() {
             </button>
           )}
         </div>
-        {kind === "http" && !info && (
+        {servers.length > 0 && !info && (
+          <div className="tool-actions" style={{ marginTop: 6 }}>
+            <Dropdown
+              width={320}
+              value=""
+              onChange={(v) => {
+                const s = servers.find((x) => `${x.kind}|${x.target}` === v);
+                if (s) {
+                  setKind(s.kind);
+                  setTarget(s.target);
+                  setHeaders(s.headers ?? []);
+                  showToast("已填入该服务器配置，点「连接」连上", "info", 3000);
+                }
+              }}
+              options={[
+                { value: "", label: `已保存的服务器（${servers.length}）` },
+                ...servers.map((s) => ({
+                  value: `${s.kind}|${s.target}`,
+                  label: `[${KINDS.find((k) => k.id === s.kind)?.label}] ${s.target}`,
+                })),
+              ]}
+            />
+            <button
+              className="btn-text"
+              onClick={() => {
+                localStorage.removeItem(SERVERS_KEY);
+                setServers([]);
+                showToast("已清空保存的服务器记录", "success", 3000);
+              }}
+            >
+              清空记录
+            </button>
+          </div>
+        )}
+        {kind !== "stdio" && !info && (
           <div className="field" style={{ marginTop: 6 }}>
             <span className="field-label">
               自定义请求头
@@ -427,7 +513,7 @@ export default function McpTool() {
       )}
 
       <div className="hint">
-        本地命令传输支持带引号的启动命令，断开或退出应用时自动结束子进程；远程地址使用 Streamable HTTP 协议，需要鉴权时添加请求头
+        本地命令传输支持带引号的启动命令，断开或退出应用时自动结束子进程；远程推荐 Streamable HTTP（2025-06-18 规范），公司内网老网关或只支持 GET /sse 的服务用「HTTP+SSE 旧版」，需要鉴权时添加请求头；连接成功的服务器会自动记住，下次一键填入
       </div>
     </div>
   );

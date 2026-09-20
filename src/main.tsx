@@ -17,6 +17,14 @@ window.addEventListener("unhandledrejection", (e) =>
   report("error", `未处理的 Promise 拒绝：${String(e.reason)}`),
 );
 
+// 启动一条环境信息,方便远程排障时对上版本与系统
+import { getVersion } from "@tauri-apps/api/app";
+getVersion()
+  .then((v) =>
+    report("info", `启动 v${v} ${navigator.userAgent}`.slice(0, 300)),
+  )
+  .catch(() => {});
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />

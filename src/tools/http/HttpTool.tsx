@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import CopyButton from "../../components/CopyButton";
 import { showConfirm } from "../../components/ConfirmDialog";
 import { showToast } from "../../components/Toast";
+import Switch from "../../components/Switch";
 import { parseCurl } from "../../lib/curl";
 import { fmtBytes } from "../../lib/format";
 
@@ -11,6 +12,7 @@ type Method = (typeof METHODS)[number];
 
 const HIST_KEY = "omnikit.http.history";
 const ENV_KEY = "omnikit.http.env";
+const RECORD_KEY = "omnikit.http.record";
 const HIST_MAX = 50;
 
 interface HttpResult {
@@ -71,6 +73,8 @@ export default function HttpTool() {
   const [envRows, setEnvRows] = useState<HeaderRow[]>([]);
   const [histOpen, setHistOpen] = useState(false);
   const [hist, setHist] = useState<HistEntry[]>([]);
+  // 请求历史记录开关(默认开;关掉后发送不落任何历史)
+  const [record, setRecord] = useState(() => localStorage.getItem(RECORD_KEY) !== "off");
 
   useEffect(() => {
     try {
@@ -86,6 +90,11 @@ export default function HttpTool() {
       /* 忽略坏数据 */
     }
   }, []);
+
+  function setRecordRun(v: boolean) {
+    setRecord(v);
+    localStorage.setItem(RECORD_KEY, v ? "on" : "off");
+  }
 
   function saveEnv(rows: HeaderRow[]) {
     setEnvRows(rows);
@@ -118,16 +127,24 @@ export default function HttpTool() {
         body: method === "GET" || method === "HEAD" ? null : applyEnv(body, envRows),
       });
       setRes(r);
-      pushHistory({
-        t: Date.now(),
-        method,
-        url: url.trim(),
-        status: r.status,
-        ms: r.time_ms,
-        headers: rows.filter((x) => x.k.trim()),
-        body,
-      });
+      if (record) {
+        pushHistory({
+          t: Date.now(),
+          method,
+          url: url.trim(),
+          status: r.status,
+          ms: r.time_ms,
+          headers: rows.filter((x) => x.k.trim()),
+          body,
+        });
+      }
     } catch (e) {
+      // 网络层失败(非 4xx/5xx)记入本地日志,便于事后排查
+      invoke("log_append", {
+        level: "warn",
+        source: "http",
+        message: `请求失败 ${method} ${url.trim()}：${String(e)}`.slice(0, 500),
+      }).catch(() => {});
       showToast(String(e), "error", 5000);
     } finally {
       setSending(false);
@@ -249,6 +266,11 @@ export default function HttpTool() {
         >
           历史{hist.length > 0 ? ` · ${hist.length}` : ""}
         </button>
+        <span className="kv-k" style={{ marginLeft: 4 }}>
+          记录历史
+          <Switch on={record} onChange={setRecordRun} />
+        </span>
+        {!record && <span className="hint">已暂停记录，发送过的请求不保留</span>}
       </div>
 
       {curlOpen && (

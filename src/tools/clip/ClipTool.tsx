@@ -42,6 +42,7 @@ export default function ClipTool() {
   const [paused, setPaused] = useState(false);
   const [q, setQ] = useState("");
   const [pins, setPins] = useState<string[]>(loadPins);
+  const [persist, setPersist] = useState(true);
 
   async function refresh() {
     try {
@@ -53,9 +54,26 @@ export default function ClipTool() {
 
   useEffect(() => {
     refresh();
+    invoke<{ clip_persist: boolean }>("settings_get")
+      .then((s) => setPersist(s.clip_persist))
+      .catch(() => {});
     const t = setInterval(refresh, 1500);
     return () => clearInterval(t);
   }, []);
+
+  async function setPersistRun(v: boolean) {
+    setPersist(v);
+    try {
+      await invoke("clip_set_persist", { persist: v });
+      showToast(
+        v ? "已开启加密落盘，重启后历史仍在" : "已关闭并删除磁盘上的历史文件",
+        "success",
+        4000,
+      );
+    } catch (e) {
+      showToast(String(e), "error");
+    }
+  }
 
   const shown = useMemo(() => {
     if (!items) return null;
@@ -117,6 +135,10 @@ export default function ClipTool() {
         </span>
         <span className={`jwt-chip ${paused ? "pending" : "valid"}`}>
           {paused ? "已暂停" : "监听中"}
+        </span>
+        <span className="kv-k">
+          落盘保存
+          <Switch on={persist} onChange={setPersistRun} />
         </span>
         <input
           className="input"
@@ -184,7 +206,7 @@ export default function ClipTool() {
           })}
       </div>
       <div className="hint">
-        历史只保存在本机内存（重启后清空），最多 500 条；注意：所有复制过的内容（含密码）都会被记录，可随时暂停或清空
+        最多 500 条；落盘开启时历史加密保存到本机（密钥存系统凭据库），重启不丢，关闭即删除文件。注意：复制过的内容（含密码）都会被记录，可随时暂停、关闭落盘或清空
       </div>
     </div>
   );

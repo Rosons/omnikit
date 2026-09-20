@@ -4,19 +4,9 @@ import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { showToast } from "../../components/Toast";
 import { baseName } from "../../lib/format";
+import { levelOf } from "../../lib/loglevel";
 
 const MAX_LINES = 5000;
-
-/** 从行内识别日志级别,兼容 [ERROR]、level=error、ERROR: 等常见写法 */
-function levelOf(line: string): "err" | "warn" | "dbg" | "info" {
-  const m = /\b(TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL)\b/i.exec(line);
-  if (!m) return "info";
-  const lv = m[1].toUpperCase();
-  if (lv === "ERROR" || lv === "FATAL" || lv === "CRITICAL") return "err";
-  if (lv === "WARN" || lv === "WARNING") return "warn";
-  if (lv === "DEBUG" || lv === "TRACE") return "dbg";
-  return "info";
-}
 
 export default function LogTailTool() {
   const [path, setPath] = useState("");

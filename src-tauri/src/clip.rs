@@ -1,7 +1,13 @@
-//! 剪贴板历史:后台轮监听系统剪贴板,记录文本与图片,全部只存内存、不落盘、不联网
+//! 剪贴板历史:后台轮询监听系统剪贴板,记录文本与图片。
+//! 默认加密落盘(密钥存系统凭据库,Windows 凭据管理器/macOS 钥匙串),可关闭(关闭即删除文件)。
+use aes_gcm::aead::{Aead, KeyInit};
+use aes_gcm::{Aes256Gcm, Nonce};
 use arboard::{Clipboard, ImageData};
-use serde::Serialize;
+use rand::rngs::OsRng;
+use rand::RngCore;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -10,8 +16,12 @@ use tauri::{AppHandle, Manager};
 const MAX_ITEMS: usize = 500;
 const MAX_TEXT: usize = 1024 * 1024;
 const MAX_PIXELS: usize = 16_000_000;
+/// 落盘文件大小上限,超出时从最旧开始丢弃
+const FILE_MAX: usize = 32 * 1024 * 1024;
+/// 落盘节流:有新记录后至少间隔这么久才写一次盘
+const SAVE_INTERVAL: u64 = 3;
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ClipItem {
     pub id: u64,
     pub kind: String,
@@ -29,6 +39,14 @@ pub struct ClipState {
     pub next_id: AtomicU64,
     pub paused: AtomicBool,
     pub last_hash: Mutex<u64>,
+    /// 是否加密落盘(来自设置,默认开)
+    pub persist: AtomicBool,
+    /// 有未写盘的新记录
+    pub dirty: AtomicBool,
+    /// 上次写盘时间(Unix 秒)
+    pub last_save: Mutex<u64>,
+    /// 密钥缓存(首次从系统凭据库取出后常驻)
+    pub key: Mutex<Option<[u8; 32]>>,
 }
 
 fn fnv(data: &[u8]) -> u64 {
@@ -74,11 +92,158 @@ fn use_base64(data: &[u8]) -> String {
     STANDARD.encode(data)
 }
 
+/* ---------- 加密落盘 ---------- */
+
+const KEY_SERVICE: &str = "omnikit";
+const KEY_USER: &str = "clipboard-history";
+
+fn clip_file(app: &AppHandle) -> Option<PathBuf> {
+    app.path().app_data_dir().ok().map(|d| d.join("clipboard").join("history.bin"))
+}
+
+/// 从系统凭据库取(没有则生成)剪贴板加密密钥;拿不到凭据库时返回 None,落盘自动停用
+fn load_key() -> Option<[u8; 32]> {
+    let entry = keyring::Entry::new(KEY_SERVICE, KEY_USER).ok()?;
+    let raw = match entry.get_password() {
+        Ok(b64) => {
+            use base64::engine::general_purpose::STANDARD;
+            use base64::Engine as _;
+            STANDARD.decode(b64).ok()?
+        }
+        Err(keyring::Error::NoEntry) => {
+            let mut k = [0u8; 32];
+            OsRng.fill_bytes(&mut k);
+            if entry.set_password(&use_base64(&k)).is_err() {
+                return None;
+            }
+            k.to_vec()
+        }
+        Err(_) => return None,
+    };
+    raw.try_into().ok()
+}
+
+fn cached_key(state: &ClipState) -> Option<[u8; 32]> {
+    let mut g = state.key.lock().unwrap();
+    if g.is_none() {
+        *g = load_key();
+    }
+    *g
+}
+
+fn encrypt(key: &[u8; 32], plain: &[u8]) -> Result<Vec<u8>, String> {
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| e.to_string())?;
+    let mut nonce = [0u8; 12];
+    OsRng.fill_bytes(&mut nonce);
+    let ct = cipher
+        .encrypt(Nonce::from_slice(&nonce), plain)
+        .map_err(|e| e.to_string())?;
+    let mut out = nonce.to_vec();
+    out.extend(ct);
+    Ok(out)
+}
+
+fn decrypt(key: &[u8; 32], data: &[u8]) -> Result<Vec<u8>, String> {
+    if data.len() <= 12 {
+        return Err("密文不完整".into());
+    }
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| e.to_string())?;
+    cipher
+        .decrypt(Nonce::from_slice(&data[..12]), &data[12..])
+        .map_err(|_| "解密失败：密文损坏或密钥不匹配".into())
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ClipFile {
+    items: Vec<ClipItem>,
+}
+
+/// 把当前历史加密写入磁盘(超限从最旧丢弃,tmp+rename 原子替换)
+fn save_now(app: &AppHandle) {
+    let st = app.state::<ClipState>();
+    if !st.persist.load(Ordering::Relaxed) {
+        return;
+    }
+    let Some(key) = cached_key(&st) else { return };
+    let Some(path) = clip_file(app) else { return };
+    let plain = {
+        let mut items = st.items.lock().unwrap();
+        loop {
+            let payload = ClipFile { items: items.clone() };
+            let Ok(json) = serde_json::to_vec(&payload) else { return };
+            if json.len() <= FILE_MAX || items.is_empty() {
+                break Some(json);
+            }
+            // 超限:丢掉最旧的 10% 再试
+            let cut = (items.len() / 10).max(1);
+            let keep = items.len() - cut;
+            items.truncate(keep);
+        }
+    };
+    let Some(json) = plain else { return };
+    let Ok(blob) = encrypt(&key, &json) else { return };
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let tmp = path.with_extension("bin.tmp");
+    if std::fs::write(&tmp, &blob).is_ok() {
+        let _ = std::fs::rename(&tmp, &path);
+    }
+    *st.last_save.lock().unwrap() = now();
+    st.dirty.store(false, Ordering::Relaxed);
+}
+
+/// 启动时恢复:读到历史后回填内存,续上 id 序列
+pub fn clip_init(app: &AppHandle) {
+    let st = app.state::<ClipState>();
+    st.persist
+        .store(crate::settings::load(app).clip_persist, Ordering::Relaxed);
+    if !st.persist.load(Ordering::Relaxed) {
+        return;
+    }
+    let Some(key) = cached_key(&st) else {
+        eprintln!("[clip] 无法获取系统凭据库密钥，本次运行不落盘");
+        return;
+    };
+    let Some(path) = clip_file(app) else { return };
+    let Ok(blob) = std::fs::read(&path) else { return };
+    let Ok(json) = decrypt(&key, &blob) else {
+        eprintln!("[clip] 历史文件解密失败，忽略");
+        return;
+    };
+    if let Ok(file) = serde_json::from_slice::<ClipFile>(&json) {
+        let mut items = st.items.lock().unwrap();
+        *items = file.items;
+        items.truncate(MAX_ITEMS);
+        let max_id = items.first().map(|i| i.id).unwrap_or(0);
+        st.next_id.store(max_id + 1, Ordering::Relaxed);
+    }
+}
+
+/// 节流写盘:有脏数据且距上次写盘超过间隔时执行(监听线程每秒调一次)
+fn maybe_save(app: &AppHandle) {
+    let st = app.state::<ClipState>();
+    if !st.dirty.load(Ordering::Relaxed) {
+        return;
+    }
+    let last = *st.last_save.lock().unwrap();
+    if now().saturating_sub(last) >= SAVE_INTERVAL {
+        save_now(app);
+    }
+}
+
+/// 退出钩子用的无条件落盘
+pub fn clip_force_save(app: &AppHandle) {
+    save_now(app);
+}
+
 fn record(app: &AppHandle, item: ClipItem) {
     let st = app.state::<ClipState>();
     let mut items = st.items.lock().unwrap();
     items.insert(0, item);
     items.truncate(MAX_ITEMS);
+    drop(items);
+    st.dirty.store(true, Ordering::Relaxed);
 }
 
 pub fn clip_monitor(app: AppHandle) {
@@ -92,6 +257,7 @@ pub fn clip_monitor(app: AppHandle) {
         {
             continue;
         }
+        maybe_save(&app);
         // 文本
         if let Ok(text) = cb.get_text() {
             if !text.is_empty() && text.len() <= MAX_TEXT {
@@ -210,7 +376,32 @@ pub fn clip_write(state: tauri::State<'_, ClipState>, id: u64) -> Result<(), Str
 }
 
 #[tauri::command]
-pub fn clip_clear(state: tauri::State<'_, ClipState>) -> Result<(), String> {
+pub fn clip_clear(state: tauri::State<'_, ClipState>, app: AppHandle) -> Result<(), String> {
     state.items.lock().unwrap().clear();
+    // 清空即删盘上历史,避免留下已「清空」的旧数据
+    if let Some(path) = clip_file(&app) {
+        let _ = std::fs::remove_file(path);
+    }
+    state.dirty.store(false, Ordering::Relaxed);
+    Ok(())
+}
+
+/// 切换加密落盘:关闭时删除历史文件,开启时立即写一次盘
+#[tauri::command]
+pub fn clip_set_persist(state: tauri::State<'_, ClipState>, app: AppHandle, persist: bool) -> Result<(), String> {
+    state.persist.store(persist, Ordering::Relaxed);
+    // 同步进 settings.json,重启后保持
+    {
+        let st = app.state::<crate::settings::SettingsState>();
+        let mut s = st.0.lock().unwrap().clone();
+        s.clip_persist = persist;
+        crate::settings::save(&app, &s);
+        *st.0.lock().unwrap() = s;
+    }
+    if persist {
+        save_now(&app);
+    } else if let Some(path) = clip_file(&app) {
+        let _ = std::fs::remove_file(path);
+    }
     Ok(())
 }

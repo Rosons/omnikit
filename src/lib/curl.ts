@@ -247,7 +247,8 @@ export function parseCurl(input: string): CurlRequest {
     const q = dataParts.join("&");
     url += (url.includes("?") ? "&" : "?") + q;
   }
-  const body = dataParts.join("&");
+  // -G 时数据已并入查询串,不再视为请求体
+  const body = toQuery ? "" : dataParts.join("&");
   if (!method) method = body ? "POST" : "GET";
 
   return { method, url, headers, body, warnings };

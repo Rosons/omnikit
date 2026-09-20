@@ -1,9 +1,9 @@
-//! MCP(Model Context Protocol)服务器调试:stdio 与 Streamable HTTP 两种传输
+//! MCP(Model Context Protocol)服务器调试:stdio、Streamable HTTP 与旧版 HTTP+SSE 三种传输
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, ChildStdin, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -41,9 +41,27 @@ struct HttpSession {
     next_id: AtomicU64,
 }
 
+/// 旧版 HTTP+SSE(2024-11-05):GET 常驻事件流拿 endpoint,消息走 POST,响应从事件流收
+struct SseSession {
+    endpoint: Arc<Mutex<String>>,
+    headers: Vec<(String, String)>,
+    rx: Mutex<Receiver<(Option<u64>, Value)>>,
+    _tx: Sender<(Option<u64>, Value)>,
+    stop: Arc<AtomicBool>,
+    log: Arc<Mutex<Vec<String>>>,
+    next_id: AtomicU64,
+}
+
+impl Drop for SseSession {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+    }
+}
+
 pub enum McpSession {
     Stdio(StdioSession),
     Http(HttpSession),
+    Sse(SseSession),
 }
 
 fn push_log(log: &Mutex<Vec<String>>, mut line: String) {
@@ -68,6 +86,7 @@ impl McpSession {
         match self {
             McpSession::Stdio(s) => &s.log,
             McpSession::Http(s) => &s.log,
+            McpSession::Sse(s) => &s.log,
         }
     }
 
@@ -82,6 +101,7 @@ impl McpSession {
         match self {
             McpSession::Stdio(s) => s.next_id.fetch_add(1, Ordering::Relaxed),
             McpSession::Http(s) => s.next_id.fetch_add(1, Ordering::Relaxed),
+            McpSession::Sse(s) => s.next_id.fetch_add(1, Ordering::Relaxed),
         }
     }
 
@@ -135,6 +155,27 @@ impl McpSession {
                     Err("响应中没有匹配的 JSON-RPC 结果".into())
                 }
             }
+            McpSession::Sse(s) => {
+                sse_post(s, &msg)?;
+                // 响应从常驻事件流收,等待逻辑与 stdio 一致
+                let deadline = Instant::now() + TIMEOUT;
+                let rx = s.rx.lock().unwrap();
+                loop {
+                    let remain = deadline.saturating_duration_since(Instant::now());
+                    if remain.is_zero() {
+                        return Err("等待响应超时，事件流可能已断开".into());
+                    }
+                    match rx.recv_timeout(remain) {
+                        Ok((mid, v)) => {
+                            if mid == Some(id) {
+                                return self.check_rpc(v);
+                            }
+                            self.log_msg("←", &v);
+                        }
+                        Err(_) => return Err("等待响应超时，事件流可能已断开".into()),
+                    }
+                }
+            }
         }
     }
 
@@ -148,19 +189,28 @@ impl McpSession {
                 sin.flush().map_err(|e| format!("进程输入写入失败：{e}"))
             }
             McpSession::Http(s) => http_post(s, &msg, false).map(|_| ()),
+            McpSession::Sse(s) => sse_post(s, &msg).map(|_| ()),
         }
     }
 }
 
 fn http_post(s: &HttpSession, msg: &Value, expect_reply: bool) -> Result<Value, String> {
     let mut req = ureq::post(&s.url)
+        // JSON-RPC 必须声明 JSON 体;ureq send_string 默认 text/plain,会被规范严格的服务端 400 拒掉
+        .set("Content-Type", "application/json")
         .set("Accept", "application/json, text/event-stream")
         .timeout(TIMEOUT);
+    let mut inited = false;
     {
         let sid = s.session_id.lock().unwrap();
         if let Some(x) = sid.as_deref() {
             req = req.set("Mcp-Session-Id", x);
+            inited = true;
         }
+    }
+    if inited {
+        // 2025-06-18 规范:初始化之后的请求都应带上协议版本头
+        req = req.set("MCP-Protocol-Version", PROTOCOL_VERSION);
     }
     for (k, v) in &s.headers {
         req = req.set(k, v);
@@ -232,6 +282,139 @@ fn truncate_str(s: &str, n: usize) -> String {
         cut -= 1;
     }
     format!("{}…", &s[..cut])
+}
+
+/// 旧版 SSE:向 endpoint POST 一条消息;响应不走这个响应体,从常驻事件流收
+fn sse_post(s: &SseSession, msg: &Value) -> Result<(), String> {
+    // endpoint 由事件流线程异步送达,这里最多等 10 秒
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let url = loop {
+        let ep = s.endpoint.lock().unwrap().clone();
+        if !ep.is_empty() {
+            break ep;
+        }
+        if Instant::now() >= deadline {
+            return Err("等待消息端点超时，服务端可能不支持 HTTP+SSE 旧协议".into());
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    let mut req = ureq::post(&url)
+        .set("Content-Type", "application/json")
+        .timeout(TIMEOUT);
+    for (k, v) in &s.headers {
+        req = req.set(k, v);
+    }
+    match req.send_string(&msg.to_string()) {
+        Ok(_) => Ok(()),
+        Err(ureq::Error::Status(code, r)) => {
+            let mut buf = Vec::new();
+            let _ = r.into_reader().take(8192).read_to_end(&mut buf);
+            let text = String::from_utf8_lossy(&buf);
+            Err(format!("HTTP {code}：{}", truncate_str(&text, 300)))
+        }
+        Err(e) => Err(format!("请求失败：{e}")),
+    }
+}
+
+/// 相对 endpoint(如 /messages/?session_id=x)拼回绝对地址
+fn resolve_endpoint(base_url: &str, ep: &str) -> String {
+    if ep.starts_with("http://") || ep.starts_with("https://") {
+        return ep.to_string();
+    }
+    let scheme_end = base_url.find("://").map(|i| i + 3).unwrap_or(0);
+    let host_end = base_url[scheme_end..]
+        .find('/')
+        .map(|i| scheme_end + i)
+        .unwrap_or(base_url.len());
+    format!("{}{}{}", &base_url[..scheme_end], &base_url[scheme_end..host_end], ep)
+}
+
+fn spawn_sse(url: String, headers: Vec<(String, String)>) -> Result<McpSession, String> {
+    let log: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let endpoint: Arc<Mutex<String>> = Arc::new(Mutex::new(String::new()));
+    let (tx, rx) = channel::<(Option<u64>, Value)>();
+    let stop = Arc::new(AtomicBool::new(false));
+    {
+        let log = log.clone();
+        let stop = stop.clone();
+        let tx = tx.clone();
+        let endpoint = endpoint.clone();
+        let base = url.clone();
+        let thread_headers = headers.clone();
+        std::thread::spawn(move || {
+            // 连接与读超时挂在 Agent 上(ureq 2 的 Request 没有连接超时入口),不设整体超时避免长连接被掐断
+            let agent = ureq::AgentBuilder::new()
+                .timeout_connect(Duration::from_secs(10))
+                .timeout_read(Duration::from_secs(300))
+                .build();
+            let mut req = agent.get(&base).set("Accept", "text/event-stream");
+            for (k, v) in &thread_headers {
+                req = req.set(k, v);
+            }
+            let resp = match req.call() {
+                Ok(r) => r,
+                Err(ureq::Error::Status(code, r)) => {
+                    let mut buf = Vec::new();
+                    let _ = r.into_reader().take(8192).read_to_end(&mut buf);
+                    let text = String::from_utf8_lossy(&buf);
+                    push_log(
+                        &log,
+                        format!("[sse] 连接失败 HTTP {code}：{}", truncate_str(&text, 300)),
+                    );
+                    return;
+                }
+                Err(e) => {
+                    push_log(&log, format!("[sse] 连接失败：{e}"));
+                    return;
+                }
+            };
+            push_log(&log, "[sse] 事件流已建立".into());
+            let reader = BufReader::new(resp.into_reader());
+            let mut event = String::new();
+            let mut data = String::new();
+            for line in reader.lines() {
+                if stop.load(Ordering::Relaxed) {
+                    return;
+                }
+                let Ok(line) = line else { break };
+                if let Some(rest) = line.strip_prefix("event:") {
+                    event = rest.trim().to_string();
+                } else if let Some(rest) = line.strip_prefix("data:") {
+                    if !data.is_empty() {
+                        data.push('\n');
+                    }
+                    data.push_str(rest.trim_start());
+                } else if line.is_empty() {
+                    // 空行 = 事件结束
+                    if !data.is_empty() {
+                        if event == "endpoint" {
+                            let ep = resolve_endpoint(&base, data.trim());
+                            push_log(&log, format!("[endpoint] {ep}"));
+                            *endpoint.lock().unwrap() = ep;
+                        } else if let Ok(v) = serde_json::from_str::<Value>(&data) {
+                            let id = v.get("id").and_then(|x| x.as_u64());
+                            push_log(&log, format!("← {v}"));
+                            if tx.send((id, v)).is_err() {
+                                return;
+                            }
+                        }
+                    }
+                    event.clear();
+                    data.clear();
+                }
+            }
+            push_log(&log, "[sse] 事件流已断开".into());
+        });
+    }
+    Ok(McpSession::Sse(SseSession {
+        endpoint,
+        headers,
+        rx: Mutex::new(rx),
+        _tx: tx,
+        stop,
+        log,
+        next_id: AtomicU64::new(1),
+    }))
 }
 
 fn split_command_line(cmd: &str) -> Vec<String> {
@@ -350,7 +533,7 @@ fn do_initialize(sess: &McpSession) -> Result<McpInfo, String> {
         json!({
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {},
-            "clientInfo": { "name": "OmniKit", "version": "0.8" }
+            "clientInfo": { "name": "OmniKit", "version": env!("CARGO_PKG_VERSION") }
         }),
     )?;
     sess.notify("notifications/initialized", json!({}))?;
@@ -430,23 +613,23 @@ pub async fn mcp_connect(
 ) -> Result<McpInfo, String> {
     let target = target.trim().to_string();
     if target.is_empty() {
-        return Err(if kind == "http" {
-            "请输入服务器地址".into()
-        } else {
+        return Err(if kind == "stdio" {
             "请输入启动命令".into()
+        } else {
+            "请输入服务器地址".into()
         });
     }
     let built = tauri::async_runtime::spawn_blocking(move || -> Result<(McpSession, McpInfo), String> {
-        let session: McpSession = if kind == "http" {
-            McpSession::Http(HttpSession {
+        let session: McpSession = match kind.as_str() {
+            "http" => McpSession::Http(HttpSession {
                 url: target,
                 headers,
                 session_id: Mutex::new(None),
                 log: Arc::new(Mutex::new(Vec::new())),
                 next_id: AtomicU64::new(1),
-            })
-        } else {
-            spawn_stdio(&target)?
+            }),
+            "sse" => spawn_sse(target, headers)?,
+            _ => spawn_stdio(&target)?,
         };
         let info = do_initialize(&session)?;
         Ok((session, info))

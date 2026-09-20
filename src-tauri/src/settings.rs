@@ -25,6 +25,8 @@ pub struct AppSettings {
     pub search_excludes: Vec<String>,
     #[serde(default = "default_search_exclude_exts")]
     pub search_exclude_exts: Vec<String>,
+    /// 剪贴板历史是否加密落盘
+    pub clip_persist: bool,
 }
 
 pub fn default_search_excludes() -> Vec<String> {
@@ -60,6 +62,7 @@ impl Default for AppSettings {
             window: None,
             search_excludes: default_search_excludes(),
             search_exclude_exts: default_search_exclude_exts(),
+            clip_persist: true,
         }
     }
 }

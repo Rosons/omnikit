@@ -1581,6 +1581,12 @@ pub async fn read_file_base64(path: String) -> Result<FileB64, String> {
     .map_err(|e| format!("任务执行失败：{e}"))?
 }
 
+/// 退出并重启应用(应用内更新安装完成后调用;restart 不会返回)
+#[tauri::command]
+pub fn restart_app(app: AppHandle) {
+    app.restart();
+}
+
 /* ---------- 通用:打开链接/日志目录、文件片段预览、检查更新、前端错误日志 ---------- */
 
 /// 用系统默认浏览器打开 http(s) 链接

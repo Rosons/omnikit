@@ -1,7 +1,7 @@
 # OmniKit 项目交接文档(原名 DevToolbox,2026-09-19 更名;项目目录名暂为 devtoolbox,其余已全部更名)
 
 > 用途:在新会话中继续开发。本文档自包含全部上下文,无需原会话历史。
-> 更新时间:2026-09-19(**v0.9.0 已加 cURL 导入/命令面板/深色主题/检查更新等一轮体验升级并出包**,见第四节「v0.9.0」)
+> 更新时间:2026-09-20(**v0.10.0 已修 MCP 400 根因/加旧版 SSE 传输/单实例锁/剪贴板加密落盘/应用内自动更新/vitest 测试门禁并出包**,见第四节「v0.10.0」)
 
 ## 一、项目是什么
 
@@ -261,6 +261,19 @@ omnikit/
 - **CI 发布链路的真正修复(v0.9.0 首跑才发现)**:upload-artifact 多路径上传时以**公共父目录为 artifact 根**——上传 `bundle/dmg/*.dmg`+`bundle/macos/*.app` 会存成 `dmg/xx.dmg` 与 `macos/OmniKit.app/...`,download merge-multiple 到 dist 后是 `dist/dmg/xx.dmg`,导致旧的 `dist/*.dmg` glob 匹配不到、`fail_on_unmatched_files` 直接失败(v0.8.0 当时能发成功是因为那次跑的还是修复前的"全量上传"配置,过滤版从未真正跑过)。修复:mac 只上传 dmg 本体(去掉 .app),发布 glob 改 `dist/**/*.exe`、`dist/**/*.dmg`;修复在 tag 上重跑需**强推标签**(`git tag -f && git push -f`,re-run 失败任务只会用旧提交的工作流)
 - 新命令 5 个:file_snippet/update_check/open_url/open_log_dir/log_append(全部注册进 lib.rs invoke_handler);工具数量仍为 4 组 18 个
 - 教训:node(Windows)读不了 git-bash 的 /tmp 路径(curl -o /tmp/x 后 node require 失败),临时文件放项目目录;package.json 是 `"type": "module"`,tsc 编译出的 .js 会被 node 当 ESM(require 返回空 {}),一次性验证要复制成 .cjs 再跑
+
+### v0.10.0 稳定性批次(2026-09-20,用户 7 项指定:MCP 修复+持久化/单实例/HTTP 记录开关/剪贴板落盘/应用内更新/前端测试/日志策略)
+- **MCP HTTP 400 根因修复**:`http_post` 用 ureq `send_string` 时**从未设 Content-Type,默认发 text/plain**,规范严格的服务端(公司网关)必拒——已显式 `Content-Type: application/json`;补 `MCP-Protocol-Version: 2025-06-18` 头(initialize 之后,以 session_id 已发为标志);clientInfo 版本改随包版本;4xx/5xx 响应体透出(300 字,`HTTP {code}：{body}`),sse_post 同样处理
+- **MCP 新增旧版 HTTP+SSE 传输**(kind `sse`,2024-11-05 老网关):GET 常驻事件流(AgentBuilder 挂 timeout_connect 10s + timeout_read 300s,**ureq 2 的 Request 没有连接超时方法**,整体超时不能设否则长连接被掐),`event: endpoint` 的 data 相对路径拼回绝对地址(resolve_endpoint),消息 POST 到 endpoint,响应从事件流收(rx channel 与 stdio 同构);sse_post 前 endpoint 未到会等最多 10s;断开=Drop 置 stop 标志(阻塞读要等读超时才退,可接受);前端 KINDS 三项,占位提示区分
+- **MCP 服务器配置持久化**:连接成功自动记住(localStorage `omnikit.mcp.servers`,kind+target 去重,≤20 条含请求头),进页自动填最近一条,Dropdown「已保存的服务器」一键填入+清空记录;连接失败/调用失败写应用日志
+- **单实例锁**:tauri-plugin-single-instance,**必须是 Builder 第一个注册的插件**,二次启动唤起已有窗口、新进程退出
+- **剪贴板加密落盘**(默认开,`clip_persist` 入 AppSettings):AES-256-GCM 加密存 `appdata/clipboard/history.bin`(tmp+rename),**密钥存系统凭据库**(keyring 3,features windows-native/apple-native,服务 omnikit/用户 clipboard-history,base64 存储,首用生成);文件超 32MB 从最旧丢 10%;脏标记+3 秒节流写盘,RunEvent::Exit 兜底强写(clip_force_save);clip_init 启动恢复并续 id;**关闭开关即删除文件**,清空也删文件;32MB 内图片都在,超限丢最旧;keyring 拿不到密钥时本次运行不落盘(eprintln)
+- **应用内自动更新**(完整链路):tauri-plugin-updater + capability `updater:default`;**签名密钥对已生成**——私钥 `E:\DevEnv\secrets\omnikit-updater.key`(空密码,**不进仓库、不进聊天记录**),公钥已写进 tauri.conf.json `plugins.updater.pubkey`,端点 `github.com/Rosons/omnikit/releases/latest/download/latest.json`;**`tauri.updater.conf.json` overlay(createUpdaterArtifacts:true)只在 CI 配了 secrets 时用**(`--config` 参数),本地与无 secrets 的 CI 构建不受影响;CI 双平台条件生成签名产物(exe.sig/app.tar.gz+sig),release 任务有 sig 时 node 组装 latest.json(平台 windows-x86_64/darwin-aarch64),发布文件清单用 find 动态生成(exe/dmg/tar.gz/sig/latest.json);前端设置页:check() 成功→「下载并安装」(Progress 事件显示 MB)+restart_app 命令重启;**插件 404/失败自动退回** update_check(GitHub API)比较版本+跳转下载页
+- **前端测试门禁**:vitest(devDep),`npm test`;`src/lib/curl.test.ts`(13 用例)/`loglevel.test.ts`/`format.test.ts`,共 22 用例;levelOf 从 LogTailTool 抽到 `src/lib/loglevel.ts`;CI 双平台 npm ci 后先 `npm test` 再 build;**教训:测试断言写漏第一个 token(-d)会误报解析器错;`-G` 时 body 已并入 URL,方法判定不能再按 body 有无判 POST**
+- **HTTP 请求历史开关**:工具栏「记录历史」Switch(localStorage `omnikit.http.record`,默认开),关闭后发送不落任何历史(带 Token 的头/体不再明文进 localStorage)
+- **日志策略**(写 %APPDATA%\logs\app.log,512KB 轮转):启动 info(版本+UA);HTTP 请求网络层失败 warn(方法+URL,不含体);MCP 连接失败 error/调用失败 warn;更新检查失败 warn、下载安装失败 error;window 全局异常 error(50 条/次上限);ErrorBoundary 崩溃栈 error——错误必记、关键路径 info、其余不记
+- 版本 0.10.0;**教训:bash 工作目录跨调用漂移(cd src-tauri 后下一条相对路径全挂),关键命令一律 cd 绝对路径;keyring 3 需要 windows-native/apple-native feature;GitHub secrets 在 step if 里可用 `${{ secrets.X != '' }}`**
+- 剩余:用户往 GitHub 仓库 Secrets 填 `TAURI_SIGNING_PRIVATE_KEY`(E:\DevEnv\secrets\omnikit-updater.key 内容)与 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`(空)后,下个 tag 自动带签名产物与 latest.json,应用内更新生效;未填也不影响常规构建发布
 
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)

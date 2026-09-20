@@ -1,6 +1,6 @@
 [package]
 name = "omnikit"
-version = "0.9.0"
+version = "0.10.0"
 edition = "2021"
 description = "开发者个人工具箱"
 
@@ -16,6 +16,9 @@ tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
+keyring = { version = "3", features = ["windows-native", "apple-native"] }
 arboard = "3"
 png = "0.17"
 flate2 = "1"

@@ -2,6 +2,16 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "OmniKit 主窗口默认权限",
-  "windows": ["main"],
-  "permissions": ["core:default", "dialog:default", "dialog:allow-save", "autostart:allow-enable", "autostart:allow-disable", "autostart:allow-is-enabled"]
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "dialog:allow-save",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled",
+    "updater:default"
+  ]
 }

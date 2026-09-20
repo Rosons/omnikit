@@ -40,6 +40,14 @@ pub(crate) fn register_hotkey(app: &AppHandle) -> Result<(), Box<dyn std::error:
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // 单实例锁必须最先注册:二次启动时唤起已有窗口,新进程随即退出
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -83,10 +91,12 @@ pub fn run() {
             commands::open_url,
             commands::open_log_dir,
             commands::log_append,
+            commands::restart_app,
             settings::settings_get,
             settings::settings_set,
             clip::clip_list,
             clip::clip_set_paused,
+            clip::clip_set_persist,
             clip::clip_write,
             clip::clip_clear,
             search::search_start,
@@ -153,7 +163,8 @@ pub fn run() {
                 let _ = register_hotkey(app.handle());
             }
 
-            // 剪贴板后台监听
+            // 剪贴板后台监听(先恢复已持久化的历史)
+            clip::clip_init(app.handle());
             let monitor_handle = app.handle().clone();
             std::thread::spawn(move || clip::clip_monitor(monitor_handle));
 
@@ -233,6 +244,15 @@ pub fn run() {
                 }
                 let mcp = app.state::<McpState>();
                 *mcp.0.lock().unwrap() = None;
+                // 退出前把未落盘的剪贴板历史写掉
+                {
+                    let clip = app.state::<clip::ClipState>();
+                    if clip.persist.load(std::sync::atomic::Ordering::Relaxed)
+                        && clip.dirty.load(std::sync::atomic::Ordering::Relaxed)
+                    {
+                        clip::clip_force_save(app);
+                    }
+                }
             }
         });
 }

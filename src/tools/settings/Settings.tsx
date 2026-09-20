@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { tools } from "../registry";
 import { showToast } from "../../components/Toast";
@@ -43,6 +44,9 @@ export default function Settings() {
   const [checking, setChecking] = useState(false);
   const [updateMsg, setUpdateMsg] = useState("");
   const [updateUrl, setUpdateUrl] = useState("");
+  // 应用内更新(需 Release 里有签名的 latest.json;没有时退回版本比较+下载页)
+  const [updater, setUpdater] = useState<Update | null>(null);
+  const [dlMsg, setDlMsg] = useState("");
 
   useEffect(() => {
     invoke<AppSettings>("settings_get")
@@ -111,18 +115,69 @@ export default function Settings() {
     setChecking(true);
     setUpdateMsg("");
     setUpdateUrl("");
+    setUpdater(null);
+    setDlMsg("");
     localStorage.setItem("omnikit.update.last", String(Date.now()));
-    invoke<UpdateInfo>("update_check")
-      .then((r) => {
+    (async () => {
+      try {
+        // 优先走更新器插件(读 Release 上的 latest.json,可应用内安装)
+        const u = await check();
+        if (u) {
+          setUpdater(u);
+          setUpdateMsg(`发现新版本 v${u.version}（当前 v${version || "…"}）`);
+        } else {
+          setUpdateMsg(`已是最新版本 v${version || "…"}`);
+        }
+        return;
+      } catch {
+        // latest.json 尚未发布或网络失败:退回 GitHub API 版本比较
+      }
+      try {
+        const r = await invoke<UpdateInfo>("update_check");
         if (r.has_update) {
           setUpdateMsg(`发现新版本 v${r.latest}（当前 v${r.current}）`);
           setUpdateUrl(r.url);
         } else {
           setUpdateMsg(`已是最新版本 v${r.current}`);
         }
-      })
-      .catch((e) => setUpdateMsg(String(e)))
-      .finally(() => setChecking(false));
+      } catch (e) {
+        setUpdateMsg(String(e));
+        invoke("log_append", {
+          level: "warn",
+          source: "updater",
+          message: `检查更新失败：${String(e)}`.slice(0, 400),
+        }).catch(() => {});
+      }
+    })().finally(() => setChecking(false));
+  }
+
+  async function installUpdate() {
+    if (!updater) return;
+    setDlMsg("准备下载…");
+    let received = 0;
+    try {
+      await updater.downloadAndInstall((evt) => {
+        if (evt.event === "Started") {
+          received = 0;
+          setDlMsg("开始下载…");
+        } else if (evt.event === "Progress") {
+          received += evt.data.chunkLength;
+          setDlMsg(`下载中 ${(received / 1024 / 1024).toFixed(1)} MB`);
+        } else if (evt.event === "Finished") {
+          setDlMsg("下载完成，正在安装…");
+        }
+      });
+      setDlMsg("安装完成，即将重启…");
+      await invoke("restart_app");
+    } catch (e) {
+      setDlMsg("");
+      showToast(String(e), "error", 6000);
+      invoke("log_append", {
+        level: "error",
+        source: "updater",
+        message: `更新下载/安装失败：${String(e)}`.slice(0, 500),
+      }).catch(() => {});
+    }
   }
 
   function goDownload() {
@@ -257,9 +312,14 @@ export default function Settings() {
               检查更新
             </span>
             <span className="hint" style={{ flex: 1 }}>
-              {updateMsg || "手动查询 GitHub 上的最新发布版本"}
+              {dlMsg || updateMsg || "查询 GitHub 上的最新发布版本，可直接下载安装"}
             </span>
-            {updateUrl && (
+            {updater && !dlMsg && (
+              <button className="btn btn-sm btn-primary" onClick={installUpdate}>
+                下载并安装
+              </button>
+            )}
+            {updateUrl && !updater && (
               <button className="btn btn-sm btn-primary" onClick={goDownload}>
                 前往下载页
               </button>

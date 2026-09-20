@@ -276,6 +276,7 @@ omnikit/
 - **修正:上一条的「secrets 在 step if 可用」是错的——`${{ secrets.X != '' }}` 写进任何 if 会让 GitHub 判整个工作流文件无效**(运行名显示为文件路径、标签不触发、push 显示 placeholder 失败);改用「脚本内 ls 判断 .sig 是否存在 + upload-artifact if-no-files-found: ignore」
 - **v0.10.0 补充(用户反馈)**:剪贴板单条删除(`clip_remove` 命令,开启落盘时立即同步写盘)与图片预览弹窗(点缩略图开 `.clip-modal` 大图,白底衬透明 PNG,可回贴);`clip_remove`/`clip_write` 等已注册进 lib.rs
 - 剩余:用户往 GitHub 仓库 Secrets 填 `TAURI_SIGNING_PRIVATE_KEY`(E:\DevEnv\secrets\omnikit-updater.key 内容)与 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`(空)后,下个 tag 自动带签名产物与 latest.json,应用内更新生效;未填也不影响常规构建发布
+- **v0.10.1(2026-09-21)**:用户已填私钥 Secrets,发此版本首跑签名链路——CI 应产出 exe.sig/app.tar.gz+sig 并在 Release 附 latest.json;装着 v0.10.0 的机器在设置页「立即检查」应能发现 v0.10.1 并应用内「下载并安装」
 
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)

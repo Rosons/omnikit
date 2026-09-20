@@ -27,7 +27,6 @@ interface UpdateInfo {
 
 const START_PAGE_KEY = "omnikit.startPage";
 const AUTO_UPDATE_KEY = "omnikit.update.auto";
-const PROXY_KEY = "omnikit.update.proxy";
 
 interface UpdaterAvail {
   current: string;
@@ -51,11 +50,10 @@ export default function Settings() {
   const [checking, setChecking] = useState(false);
   const [updateMsg, setUpdateMsg] = useState("");
   const [updateUrl, setUpdateUrl] = useState("");
-  // 应用内更新:走 updater_check/updater_download 命令,支持配置代理(应对 github.com 直连不通)
+  // 应用内更新:走 updater_check/updater_download 命令直连 GitHub;不通时退回版本比较+下载页
   const [updater, setUpdater] = useState<UpdaterAvail | null>(null);
   const [dlMsg, setDlMsg] = useState("");
   const [pluginErr, setPluginErr] = useState("");
-  const [proxy, setProxy] = useState(localStorage.getItem(PROXY_KEY) ?? "");
 
   useEffect(() => {
     invoke<AppSettings>("settings_get")
@@ -142,7 +140,7 @@ export default function Settings() {
     (async () => {
       // 先走更新器插件(读 Release 的 latest.json,可应用内安装;失败多半是 github.com 直连不通,可配代理)
       try {
-        const avail = await invoke<UpdaterAvail | null>("updater_check", { proxy });
+        const avail = await invoke<UpdaterAvail | null>("updater_check");
         if (avail) {
           setUpdater(avail);
           setUpdateMsg(`发现新版本 v${avail.version}（当前 v${avail.current}）`);
@@ -181,7 +179,7 @@ export default function Settings() {
   async function installUpdate() {
     setDlMsg("准备下载…");
     try {
-      await invoke("updater_download", { proxy });
+      await invoke("updater_download");
       setDlMsg("安装完成，即将重启…");
       await invoke("restart_app");
     } catch (e) {
@@ -193,11 +191,6 @@ export default function Settings() {
         message: `更新下载/安装失败：${String(e)}`.slice(0, 500),
       }).catch(() => {});
     }
-  }
-
-  function saveProxy(v: string) {
-    setProxy(v);
-    localStorage.setItem(PROXY_KEY, v);
   }
 
   function goDownload() {
@@ -350,23 +343,6 @@ export default function Settings() {
             <button className="btn btn-sm" onClick={checkUpdate} disabled={checking}>
               {checking ? "检查中…" : "立即检查"}
             </button>
-          </div>
-          <div className="kv-row">
-            <span className="kv-k" style={{ minWidth: 170 }}>
-              更新代理
-            </span>
-            <input
-              className="input input-sm input-mono"
-              style={{ flex: 1, maxWidth: 300 }}
-              value={proxy}
-              onChange={(e) => setProxy(e.target.value)}
-              onBlur={() => saveProxy(proxy)}
-              placeholder="如 http://127.0.0.1:7890，直连可用则留空"
-              spellCheck={false}
-            />
-            <span className="hint" style={{ flex: 1 }}>
-              github.com 直连不通的环境填本机代理，仅用于下载更新
-            </span>
           </div>
         </div>
       </div>

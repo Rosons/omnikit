@@ -1,6 +1,6 @@
 [package]
 name = "omnikit"
-version = "0.10.3"
+version = "0.10.4"
 edition = "2021"
 description = "开发者个人工具箱"
 

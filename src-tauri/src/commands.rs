@@ -1588,7 +1588,7 @@ pub fn restart_app(app: AppHandle) {
     app.restart();
 }
 
-/* ---------- 应用内更新(可配代理,应对 github.com 直连不通的网络) ---------- */
+/* ---------- 应用内更新(直连 GitHub;网络不通时由前端兜底为版本比较+下载页) ---------- */
 
 #[derive(Serialize)]
 pub struct UpdaterAvail {
@@ -1597,26 +1597,13 @@ pub struct UpdaterAvail {
     pub notes: String,
 }
 
-/// 构造更新器:proxy 非空时全部流量走该代理
-fn build_updater(
-    app: &AppHandle,
-    proxy: Option<&str>,
-) -> Result<tauri_plugin_updater::Updater, String> {
-    let mut builder = app.updater_builder();
-    if let Some(p) = proxy.map(str::trim).filter(|p| !p.is_empty()) {
-        let url = tauri::Url::parse(p).map_err(|e| format!("代理地址不合法：{e}"))?;
-        builder = builder.proxy(url);
-    }
-    builder.build().map_err(|e| format!("更新器初始化失败：{e}"))
-}
-
 /// 读 latest.json,返回 Some 表示有新版本
 #[tauri::command]
-pub async fn updater_check(
-    app: AppHandle,
-    proxy: Option<String>,
-) -> Result<Option<UpdaterAvail>, String> {
-    let updater = build_updater(&app, proxy.as_deref())?;
+pub async fn updater_check(app: AppHandle) -> Result<Option<UpdaterAvail>, String> {
+    let updater = app
+        .updater_builder()
+        .build()
+        .map_err(|e| format!("更新器初始化失败：{e}"))?;
     let upd = updater
         .check()
         .await
@@ -1630,8 +1617,11 @@ pub async fn updater_check(
 
 /// 下载并安装更新;进度走 updater://progress 事件(received, total),完成后由前端调 restart_app 重启
 #[tauri::command]
-pub async fn updater_download(app: AppHandle, proxy: Option<String>) -> Result<(), String> {
-    let updater = build_updater(&app, proxy.as_deref())?;
+pub async fn updater_download(app: AppHandle) -> Result<(), String> {
+    let updater = app
+        .updater_builder()
+        .build()
+        .map_err(|e| format!("更新器初始化失败：{e}"))?;
     let mut upd = updater
         .check()
         .await

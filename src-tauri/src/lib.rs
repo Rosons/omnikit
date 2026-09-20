@@ -88,6 +88,8 @@ pub fn run() {
             commands::read_file_base64,
             commands::file_snippet,
             commands::update_check,
+            commands::updater_check,
+            commands::updater_download,
             commands::open_url,
             commands::open_log_dir,
             commands::log_append,

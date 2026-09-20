@@ -34,6 +34,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_updater::UpdaterExt;
 use walkdir::WalkDir;
 use zeroize::Zeroizing;
 
@@ -1585,6 +1586,67 @@ pub async fn read_file_base64(path: String) -> Result<FileB64, String> {
 #[tauri::command]
 pub fn restart_app(app: AppHandle) {
     app.restart();
+}
+
+/* ---------- 应用内更新(可配代理,应对 github.com 直连不通的网络) ---------- */
+
+#[derive(Serialize)]
+pub struct UpdaterAvail {
+    pub current: String,
+    pub version: String,
+    pub notes: String,
+}
+
+/// 构造更新器:proxy 非空时全部流量走该代理
+fn build_updater(
+    app: &AppHandle,
+    proxy: Option<&str>,
+) -> Result<tauri_plugin_updater::Updater, String> {
+    let mut builder = app.updater_builder();
+    if let Some(p) = proxy.map(str::trim).filter(|p| !p.is_empty()) {
+        let url = tauri::Url::parse(p).map_err(|e| format!("代理地址不合法：{e}"))?;
+        builder = builder.proxy(url);
+    }
+    builder.build().map_err(|e| format!("更新器初始化失败：{e}"))
+}
+
+/// 读 latest.json,返回 Some 表示有新版本
+#[tauri::command]
+pub async fn updater_check(
+    app: AppHandle,
+    proxy: Option<String>,
+) -> Result<Option<UpdaterAvail>, String> {
+    let updater = build_updater(&app, proxy.as_deref())?;
+    let upd = updater
+        .check()
+        .await
+        .map_err(|e| format!("更新检查失败：{e}"))?;
+    Ok(upd.map(|u| UpdaterAvail {
+        current: u.current_version,
+        version: u.version,
+        notes: u.body.unwrap_or_default(),
+    }))
+}
+
+/// 下载并安装更新;进度走 updater://progress 事件(received, total),完成后由前端调 restart_app 重启
+#[tauri::command]
+pub async fn updater_download(app: AppHandle, proxy: Option<String>) -> Result<(), String> {
+    let updater = build_updater(&app, proxy.as_deref())?;
+    let mut upd = updater
+        .check()
+        .await
+        .map_err(|e| format!("更新检查失败：{e}"))?
+        .ok_or_else(|| "当前已是最新版本".to_string())?;
+    let emit_app = app.clone();
+    upd.download_and_install(
+        move |received, total| {
+            let _ = emit_app.emit("updater://progress", (received, total));
+        },
+        || {},
+    )
+    .await
+    .map_err(|e| format!("下载或安装失败：{e}"))?;
+    Ok(())
 }
 
 /* ---------- 通用:打开链接/日志目录、文件片段预览、检查更新、前端错误日志 ---------- */

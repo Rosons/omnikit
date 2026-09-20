@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
-import { check, type Update } from "@tauri-apps/plugin-updater";
+import { listen } from "@tauri-apps/api/event";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { tools } from "../registry";
 import { showToast } from "../../components/Toast";
@@ -27,6 +27,13 @@ interface UpdateInfo {
 
 const START_PAGE_KEY = "omnikit.startPage";
 const AUTO_UPDATE_KEY = "omnikit.update.auto";
+const PROXY_KEY = "omnikit.update.proxy";
+
+interface UpdaterAvail {
+  current: string;
+  version: string;
+  notes: string;
+}
 
 export default function Settings() {
   const [closeToTray, setCloseToTray] = useState(false);
@@ -44,9 +51,11 @@ export default function Settings() {
   const [checking, setChecking] = useState(false);
   const [updateMsg, setUpdateMsg] = useState("");
   const [updateUrl, setUpdateUrl] = useState("");
-  // 应用内更新(需 Release 里有签名的 latest.json;没有时退回版本比较+下载页)
-  const [updater, setUpdater] = useState<Update | null>(null);
+  // 应用内更新:走 updater_check/updater_download 命令,支持配置代理(应对 github.com 直连不通)
+  const [updater, setUpdater] = useState<UpdaterAvail | null>(null);
   const [dlMsg, setDlMsg] = useState("");
+  const [pluginErr, setPluginErr] = useState("");
+  const [proxy, setProxy] = useState(localStorage.getItem(PROXY_KEY) ?? "");
 
   useEffect(() => {
     invoke<AppSettings>("settings_get")
@@ -62,6 +71,17 @@ export default function Settings() {
       .then(setAutoStart)
       .catch(() => {});
     getVersion().then(setVersion).catch(() => {});
+    const un = listen<[number, number | null]>("updater://progress", (e) => {
+      const [received, total] = e.payload;
+      setDlMsg(
+        total
+          ? `下载中 ${(received / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MB`
+          : `下载中 ${(received / 1048576).toFixed(1)} MB`,
+      );
+    });
+    return () => {
+      un.then((fn) => fn());
+    };
   }, []);
 
   async function setClose(v: boolean) {
@@ -117,21 +137,28 @@ export default function Settings() {
     setUpdateUrl("");
     setUpdater(null);
     setDlMsg("");
+    setPluginErr("");
     localStorage.setItem("omnikit.update.last", String(Date.now()));
     (async () => {
+      // 先走更新器插件(读 Release 的 latest.json,可应用内安装;失败多半是 github.com 直连不通,可配代理)
       try {
-        // 优先走更新器插件(读 Release 上的 latest.json,可应用内安装)
-        const u = await check();
-        if (u) {
-          setUpdater(u);
-          setUpdateMsg(`发现新版本 v${u.version}（当前 v${version || "…"}）`);
+        const avail = await invoke<UpdaterAvail | null>("updater_check", { proxy });
+        if (avail) {
+          setUpdater(avail);
+          setUpdateMsg(`发现新版本 v${avail.version}（当前 v${avail.current}）`);
         } else {
           setUpdateMsg(`已是最新版本 v${version || "…"}`);
         }
         return;
-      } catch {
-        // latest.json 尚未发布或网络失败:退回 GitHub API 版本比较
+      } catch (e) {
+        setPluginErr(String(e));
+        invoke("log_append", {
+          level: "warn",
+          source: "updater",
+          message: `应用内更新检查失败：${String(e)}`.slice(0, 500),
+        }).catch(() => {});
       }
+      // 退回 GitHub API 版本比较(api.github.com 直连可用)
       try {
         const r = await invoke<UpdateInfo>("update_check");
         if (r.has_update) {
@@ -152,21 +179,9 @@ export default function Settings() {
   }
 
   async function installUpdate() {
-    if (!updater) return;
     setDlMsg("准备下载…");
-    let received = 0;
     try {
-      await updater.downloadAndInstall((evt) => {
-        if (evt.event === "Started") {
-          received = 0;
-          setDlMsg("开始下载…");
-        } else if (evt.event === "Progress") {
-          received += evt.data.chunkLength;
-          setDlMsg(`下载中 ${(received / 1024 / 1024).toFixed(1)} MB`);
-        } else if (evt.event === "Finished") {
-          setDlMsg("下载完成，正在安装…");
-        }
-      });
+      await invoke("updater_download", { proxy });
       setDlMsg("安装完成，即将重启…");
       await invoke("restart_app");
     } catch (e) {
@@ -178,6 +193,11 @@ export default function Settings() {
         message: `更新下载/安装失败：${String(e)}`.slice(0, 500),
       }).catch(() => {});
     }
+  }
+
+  function saveProxy(v: string) {
+    setProxy(v);
+    localStorage.setItem(PROXY_KEY, v);
   }
 
   function goDownload() {
@@ -312,7 +332,10 @@ export default function Settings() {
               检查更新
             </span>
             <span className="hint" style={{ flex: 1 }}>
-              {dlMsg || updateMsg || "查询 GitHub 上的最新发布版本，可直接下载安装"}
+              {dlMsg ||
+                updateMsg +
+                  (pluginErr ? `（应用内更新不可用：${pluginErr}）` : "") ||
+                "查询 GitHub 上的最新发布版本，可直接下载安装"}
             </span>
             {updater && !dlMsg && (
               <button className="btn btn-sm btn-primary" onClick={installUpdate}>
@@ -327,6 +350,23 @@ export default function Settings() {
             <button className="btn btn-sm" onClick={checkUpdate} disabled={checking}>
               {checking ? "检查中…" : "立即检查"}
             </button>
+          </div>
+          <div className="kv-row">
+            <span className="kv-k" style={{ minWidth: 170 }}>
+              更新代理
+            </span>
+            <input
+              className="input input-sm input-mono"
+              style={{ flex: 1, maxWidth: 300 }}
+              value={proxy}
+              onChange={(e) => setProxy(e.target.value)}
+              onBlur={() => saveProxy(proxy)}
+              placeholder="如 http://127.0.0.1:7890，直连可用则留空"
+              spellCheck={false}
+            />
+            <span className="hint" style={{ flex: 1 }}>
+              github.com 直连不通的环境填本机代理，仅用于下载更新
+            </span>
           </div>
         </div>
       </div>

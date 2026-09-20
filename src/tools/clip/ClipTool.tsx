@@ -16,10 +16,32 @@ interface ClipItem {
   time: number;
 }
 
+const PINS_KEY = "omnikit.clip.pins";
+
+/** 置顶标记的内容指纹:文本用哈希,图片用尺寸+字节组合 */
+function pinKey(it: ClipItem): string {
+  if (it.kind === "text" && it.text) {
+    let h = 5381;
+    for (let i = 0; i < it.text.length; i++) h = ((h << 5) + h + it.text.charCodeAt(i)) | 0;
+    return `t${(h >>> 0).toString(36)}`;
+  }
+  return `i${it.width}x${it.height}b${it.bytes}`;
+}
+
+function loadPins(): string[] {
+  try {
+    const arr = JSON.parse(localStorage.getItem(PINS_KEY) ?? "[]");
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function ClipTool() {
   const [items, setItems] = useState<ClipItem[] | null>(null);
   const [paused, setPaused] = useState(false);
   const [q, setQ] = useState("");
+  const [pins, setPins] = useState<string[]>(loadPins);
 
   async function refresh() {
     try {
@@ -38,8 +60,23 @@ export default function ClipTool() {
   const shown = useMemo(() => {
     if (!items) return null;
     const s = q.trim().toLowerCase();
-    return s ? items.filter((i) => (i.text ?? "").toLowerCase().includes(s)) : items;
-  }, [items, q]);
+    const filtered = s ? items.filter((i) => (i.text ?? "").toLowerCase().includes(s)) : items;
+    // 置顶的排前面,其余保持时间倒序(排序稳定)
+    return [...filtered].sort(
+      (a, b) => Number(pins.includes(pinKey(b))) - Number(pins.includes(pinKey(a))),
+    );
+  }, [items, q, pins]);
+
+  function togglePin(it: ClipItem) {
+    setPins((prev) => {
+      const k = pinKey(it);
+      const next = (
+        prev.includes(k) ? prev.filter((x) => x !== k) : [k, ...prev]
+      ).slice(0, 50);
+      localStorage.setItem(PINS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
 
   async function setPausedRun(v: boolean) {
     setPaused(v);
@@ -110,31 +147,41 @@ export default function ClipTool() {
 
       <div className="kv-list">
         {shown &&
-          shown.map((it) => (
-            <div className="kv-row clip-row" key={it.id}>
-              {it.kind === "image" && it.image_base64 ? (
-                <img
-                  className="clip-thumb"
-                  src={`data:image/png;base64,${it.image_base64}`}
-                  alt="剪贴板图片"
-                />
-              ) : (
-                <span className="clip-text" title={it.text ?? ""}>
-                  {it.text || "（空）"}
+          shown.map((it) => {
+            const isPinned = pins.includes(pinKey(it));
+            return (
+              <div className="kv-row clip-row" key={it.id}>
+                {it.kind === "image" && it.image_base64 ? (
+                  <img
+                    className="clip-thumb"
+                    src={`data:image/png;base64,${it.image_base64}`}
+                    alt="剪贴板图片"
+                  />
+                ) : (
+                  <span className="clip-text" title={it.text ?? ""}>
+                    {it.text || "（空）"}
+                  </span>
+                )}
+                <span className="kv-k">
+                  {it.kind === "image"
+                    ? `图片 ${it.width}×${it.height} · ${fmtBytes(it.bytes)}`
+                    : fmtBytes(new Blob([it.text ?? ""]).size)}
+                  {" · "}
+                  {fmtTime(it.time)}
                 </span>
-              )}
-              <span className="kv-k">
-                {it.kind === "image"
-                  ? `图片 ${it.width}×${it.height} · ${fmtBytes(it.bytes)}`
-                  : fmtBytes(new Blob([it.text ?? ""]).size)}
-                {" · "}
-                {fmtTime(it.time)}
-              </span>
-              <button className="btn-text" onClick={() => writeBack(it)}>
-                回贴
-              </button>
-            </div>
-          ))}
+                <button
+                  className={`btn-text clip-pin${isPinned ? " on" : ""}`}
+                  onClick={() => togglePin(it)}
+                  title={isPinned ? "取消置顶" : "置顶显示在前面"}
+                >
+                  {isPinned ? "已置顶" : "置顶"}
+                </button>
+                <button className="btn-text" onClick={() => writeBack(it)}>
+                  回贴
+                </button>
+              </div>
+            );
+          })}
       </div>
       <div className="hint">
         历史只保存在本机内存（重启后清空），最多 500 条；注意：所有复制过的内容（含密码）都会被记录，可随时暂停或清空

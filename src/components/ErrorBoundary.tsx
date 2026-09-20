@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 interface State {
   err: Error | null;
@@ -10,6 +11,15 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
 
   static getDerivedStateFromError(err: Error): State {
     return { err };
+  }
+
+  // 崩溃信息落盘,便于事后排查远程用户的问题
+  componentDidCatch(err: Error) {
+    invoke("log_append", {
+      level: "error",
+      source: "ui",
+      message: err.stack ?? err.message,
+    }).catch(() => {});
   }
 
   render() {

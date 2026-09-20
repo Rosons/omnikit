@@ -1,11 +1,15 @@
-import { Suspense, useEffect, useState } from "react";
-import { tools, GROUPS, type ToolGroup } from "./tools/registry";
-import { ToastHost } from "./components/Toast";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { tools, GROUPS, type ToolGroup, type ToolModule } from "./tools/registry";
+import { ToastHost, showToast } from "./components/Toast";
 import { ConfirmHost } from "./components/ConfirmDialog";
 import Settings from "./tools/settings/Settings";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const COLLAPSE_KEY = "omnikit.sidebar.collapsed";
+const FAVS_KEY = "omnikit.favs";
 
 function loadCollapsed(): Set<ToolGroup> {
   try {
@@ -13,6 +17,16 @@ function loadCollapsed(): Set<ToolGroup> {
     return raw ? new Set(JSON.parse(raw) as ToolGroup[]) : new Set();
   } catch {
     return new Set();
+  }
+}
+
+function loadFavs(): string[] {
+  try {
+    const raw = localStorage.getItem(FAVS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((id: string) => tools.some((t) => t.id === id)) : [];
+  } catch {
+    return [];
   }
 }
 
@@ -31,6 +45,9 @@ export default function App() {
   const ActiveIcon = active.icon;
   const ActiveComponent = active.component;
   const [collapsed, setCollapsed] = useState<Set<ToolGroup>>(loadCollapsed);
+  const [favs, setFavs] = useState<string[]>(loadFavs);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [version, setVersion] = useState("");
 
   // 折叠状态持久化
   useEffect(() => {
@@ -67,6 +84,66 @@ export default function App() {
     return () => window.removeEventListener("omnikit:navigate", handler);
   }, []);
 
+  // 托盘「剪贴板历史」直达:恢复窗口后由后端发来切页事件
+  useEffect(() => {
+    const un = listen<string>("omnikit://goto", (e) => {
+      if (tools.some((t) => t.id === e.payload)) {
+        setActiveId(e.payload);
+        setShowSettings(false);
+      }
+    });
+    return () => {
+      un.then((fn) => fn());
+    };
+  }, []);
+
+  // Ctrl/Cmd+K 命令面板
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", fn);
+    return () => window.removeEventListener("keydown", fn);
+  }, []);
+
+  // 版本号取自应用本体,与打包配置天然一致
+  useEffect(() => {
+    getVersion().then(setVersion).catch(() => {});
+  }, []);
+
+  // 启动时静默检查更新(每天最多一次,可在设置里关)
+  useEffect(() => {
+    const KEY_LAST = "omnikit.update.last";
+    if (localStorage.getItem("omnikit.update.auto") === "off") return;
+    const last = Number(localStorage.getItem(KEY_LAST) ?? 0);
+    if (Date.now() - last < 24 * 3600 * 1000) return;
+    localStorage.setItem(KEY_LAST, String(Date.now()));
+    invoke<{ has_update: boolean; latest: string }>("update_check")
+      .then((r) => {
+        if (r.has_update) {
+          showToast(`发现新版本 v${r.latest}，可在设置页查看并前往下载`, "info", 6000);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  function openTool(id: string) {
+    setActiveId(id);
+    setShowSettings(false);
+    setPaletteOpen(false);
+  }
+
+  function toggleFav(id: string) {
+    setFavs((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      localStorage.setItem(FAVS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
   function toggleGroup(g: ToolGroup) {
     setCollapsed((s) => {
       const n = new Set(s);
@@ -75,6 +152,36 @@ export default function App() {
       return n;
     });
   }
+
+  function renderToolItem(tool: ToolModule) {
+    const Icon = tool.icon;
+    return (
+      <button
+        key={tool.id}
+        className={`tool-item${tool.id === activeId && !showSettings ? " active" : ""}`}
+        onClick={() => openTool(tool.id)}
+      >
+        <span className="tool-icon">
+          <Icon size={15} />
+        </span>
+        <span className="tool-name">{tool.name}</span>
+        <span
+          className={`fav-star${favs.includes(tool.id) ? " on" : ""}`}
+          role="button"
+          tabIndex={-1}
+          title={favs.includes(tool.id) ? "取消常用" : "设为常用"}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleFav(tool.id);
+          }}
+        >
+          {favs.includes(tool.id) ? "★" : "☆"}
+        </span>
+      </button>
+    );
+  }
+
+  const favTools = tools.filter((t) => favs.includes(t.id));
 
   return (
     <div className="app">
@@ -99,6 +206,14 @@ export default function App() {
         </div>
 
         <nav className="tool-list">
+          {favTools.length > 0 && (
+            <div className="tool-group">
+              <div className="group-head group-head-static">
+                <span>常用</span>
+              </div>
+              {favTools.map(renderToolItem)}
+            </div>
+          )}
           {GROUPS.map((g) => {
             const items = tools.filter((t) => t.group === g.id);
             const isCollapsed = collapsed.has(g.id);
@@ -120,25 +235,7 @@ export default function App() {
                     />
                   </svg>
                 </button>
-                {!isCollapsed &&
-                  items.map((tool) => {
-                    const Icon = tool.icon;
-                    return (
-                      <button
-                        key={tool.id}
-                        className={`tool-item${tool.id === activeId && !showSettings ? " active" : ""}`}
-                        onClick={() => {
-                          setActiveId(tool.id);
-                          setShowSettings(false);
-                        }}
-                      >
-                        <span className="tool-icon">
-                          <Icon size={15} />
-                        </span>
-                        <span className="tool-name">{tool.name}</span>
-                      </button>
-                    );
-                  })}
+                {!isCollapsed && items.map(renderToolItem)}
               </div>
             );
           })}
@@ -155,7 +252,9 @@ export default function App() {
             <span className="tool-name">设置</span>
           </button>
         </div>
-        <div className="sidebar-footer">OmniKit v0.8.0 · 本地处理，数据不出设备</div>
+        <div className="sidebar-footer">
+          OmniKit{version ? ` v${version}` : ""} · 本地处理，数据不出设备
+        </div>
       </aside>
 
       <main className="main">
@@ -164,6 +263,13 @@ export default function App() {
           <p className="main-desc">
             {showSettings ? "应用偏好设置" : active.desc}
           </p>
+          <button
+            className="btn btn-sm header-search"
+            onClick={() => setPaletteOpen(true)}
+            title="快速打开工具"
+          >
+            快速打开 <span className="kbd">Ctrl K</span>
+          </button>
         </header>
         <div className="main-body">
           {showSettings ? (
@@ -177,8 +283,123 @@ export default function App() {
           )}
         </div>
       </main>
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onPick={openTool}
+        favs={favs}
+        onToggleFav={toggleFav}
+      />
       <ToastHost />
       <ConfirmHost />
+    </div>
+  );
+}
+
+/** Ctrl+K 快速切换工具的命令面板 */
+function CommandPalette({
+  open,
+  onClose,
+  onPick,
+  favs,
+  onToggleFav,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onPick: (id: string) => void;
+  favs: string[];
+  onToggleFav: (id: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setQ("");
+      setSel(0);
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }, [open]);
+
+  const list = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    const base = s
+      ? tools.filter((t) => (t.name + t.desc + t.id).toLowerCase().includes(s))
+      : [...tools].sort(
+          (a, b) => Number(favs.includes(b.id)) - Number(favs.includes(a.id)),
+        );
+    return base.slice(0, 10);
+  }, [q, favs]);
+
+  useEffect(() => {
+    setSel(0);
+  }, [q]);
+
+  if (!open) return null;
+
+  return (
+    <div className="palette-mask" onClick={onClose}>
+      <div className="palette" onClick={(e) => e.stopPropagation()}>
+        <input
+          ref={inputRef}
+          className="input palette-input"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="输入名称快速打开工具"
+          spellCheck={false}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setSel((s) => Math.min(s + 1, list.length - 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setSel((s) => Math.max(s - 1, 0));
+            } else if (e.key === "Enter") {
+              const t = list[sel];
+              if (t) onPick(t.id);
+            } else if (e.key === "Escape") {
+              onClose();
+            }
+          }}
+        />
+        <div className="palette-list">
+          {list.map((t, i) => {
+            const Icon = t.icon;
+            return (
+              <div
+                key={t.id}
+                className={`palette-item${i === sel ? " active" : ""}`}
+                onMouseEnter={() => setSel(i)}
+                onClick={() => onPick(t.id)}
+              >
+                <span className="tool-icon">
+                  <Icon size={15} />
+                </span>
+                <span className="palette-name">{t.name}</span>
+                <span className="palette-desc">{t.desc}</span>
+                <span
+                  className={`palette-fav${favs.includes(t.id) ? " on" : ""}`}
+                  role="button"
+                  title={favs.includes(t.id) ? "取消常用" : "设为常用"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFav(t.id);
+                  }}
+                >
+                  {favs.includes(t.id) ? "★" : "☆"}
+                </span>
+              </div>
+            );
+          })}
+          {list.length === 0 && <div className="palette-empty">没有匹配的工具</div>}
+        </div>
+        <div className="palette-foot">
+          <span>↑↓ 选择 · Enter 打开 · Esc 关闭</span>
+          <span>标 ★ 的工具会置顶在侧栏「常用」</span>
+        </div>
+      </div>
     </div>
   );
 }

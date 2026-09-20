@@ -7,6 +7,17 @@ import { baseName } from "../../lib/format";
 
 const MAX_LINES = 5000;
 
+/** 从行内识别日志级别,兼容 [ERROR]、level=error、ERROR: 等常见写法 */
+function levelOf(line: string): "err" | "warn" | "dbg" | "info" {
+  const m = /\b(TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL)\b/i.exec(line);
+  if (!m) return "info";
+  const lv = m[1].toUpperCase();
+  if (lv === "ERROR" || lv === "FATAL" || lv === "CRITICAL") return "err";
+  if (lv === "WARN" || lv === "WARNING") return "warn";
+  if (lv === "DEBUG" || lv === "TRACE") return "dbg";
+  return "info";
+}
+
 export default function LogTailTool() {
   const [path, setPath] = useState("");
   const [watching, setWatching] = useState(false);
@@ -74,7 +85,10 @@ export default function LogTailTool() {
   }, [shown, follow]);
 
   function renderLine(line: string, i: number) {
-    if (!kw) return <div key={i}>{line === "" ? "\u00A0" : line}</div>;
+    const lv = levelOf(line);
+    const cls =
+      lv === "err" ? " log-lv-err" : lv === "warn" ? " log-lv-warn" : lv === "dbg" ? " log-lv-dbg" : "";
+    if (!kw) return <div key={i} className={cls}>{line === "" ? "\u00A0" : line}</div>;
     const lower = line.toLowerCase();
     const parts: ReactNode[] = [];
     let pos = 0;
@@ -91,7 +105,7 @@ export default function LogTailTool() {
       idx = lower.indexOf(kw, pos);
     }
     if (pos < line.length) parts.push(<span key={key++}>{line.slice(pos)}</span>);
-    return <div key={i}>{parts.length ? parts : "\u00A0"}</div>;
+    return <div key={i} className={cls}>{parts.length ? parts : "\u00A0"}</div>;
   }
 
   return (

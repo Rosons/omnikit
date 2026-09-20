@@ -1,7 +1,7 @@
 # OmniKit 项目交接文档(原名 DevToolbox,2026-09-19 更名;项目目录名暂为 devtoolbox,其余已全部更名)
 
 > 用途:在新会话中继续开发。本文档自包含全部上下文,无需原会话历史。
-> 更新时间:2026-09-18(**v0.1.2 已新增二维码/文本对比工具并出包**,见第四节「v0.1.2」)
+> 更新时间:2026-09-19(**v0.9.0 已加 cURL 导入/命令面板/深色主题/检查更新等一轮体验升级并出包**,见第四节「v0.9.0」)
 
 ## 一、项目是什么
 
@@ -244,6 +244,22 @@ omnikit/
   - **查询防抖**(用户反馈输入卡顿):后端 search_query 改**队列化异步**——每次请求分配递增代数(query_seq),spawn_blocking 扫描,完成回填 query_result;等待循环里若结果代数落后最新请求则返回 stale,前端防抖 350ms、stale 时保持旧结果不闪烁;避免快速输入时扫描请求堆积互相阻塞
   - **索引进度条**(用户要求):`idx://progress` 事件带 phase(scanning/done/stopped)与 estimate(上次索引的文件数);有基准时百分比=min(95, files/estimate),无基准显示流动动画条+实时计数;`.idx-progress/.idx-bar/.flowing` 样式;修复 btn-sm 双重定义(30/28)统一 28
 - 设置页开关用 `Switch` 组件(`src/components/Switch.tsx`),下拉用 `Dropdown` 组件(`src/components/Dropdown.tsx`,菜单 fixed 定位防 kv-list overflow 裁剪,菜单内滚动不关闭、页面滚动才收起、贴底自动上弹)
+
+### v0.9.0 体验升级批次(2026-09-19,用户在功能盘点里指定:新工具只要 cURL 导入,其余做现有工具优化与工程项)
+- **cURL 导入 HTTP 测试**:解析器 `src/lib/curl.ts`(`tokenize` 按 shell 规则切参:单双引号/反斜杠续行与转义;`parseCurl` 支持 -X/-H/-d 家族/--data-urlencode/--json/-F(转 body+提醒)/-u(Basic 认证)/-A/-e/-b/-G(-d 拼到 query)/-I/-x(忽略+提醒),兼容 `-XPOST` 附加值与 `--flag=value`,未知旗标记 warnings 不中断;无 URL 抛错)。HttpTool 加「导入 cURL」面板,解析成功自动填方法/地址/头/体并提示提醒条数;**METHODS 增加 HEAD**(请求体隐藏条件同步改)
+- **HTTP 请求历史**(localStorage `omnikit.http.history`,50 条:时间/方法/URL/状态/耗时/请求快照,点击恢复,单条删除+清空带确认)与**环境变量**(`omnikit.http.env`,键值对;发送时把 URL/头值/请求体中的 `{{名称}}` 替换,未定义保持原样);工具栏三个 `btn btn-sm` 开关按钮(面板式,`btn-selected` 高亮)
+- **Ctrl+K 命令面板**(App.tsx `CommandPalette`):全局 keydown Ctrl/Cmd+K 开关,输入按名称+描述+id 过滤,↑↓/Enter/Esc 键盘导航,空查询时常用置前;条目行内可标 ★;主区标题栏加「快速打开 Ctrl K」按钮(`.kbd` 键帽样式)
+- **常用收藏**:侧栏每个工具行悬停出现星标(`.fav-star` 默认 opacity:0),存 localStorage `omnikit.favs`;侧栏顶部新增「常用」组(收藏非空才显示),条目与正式组复用同一 renderToolItem
+- **文件搜索增强**:结果扩展名分布 chips(取前 8 类,`.ts · 12` 计数,可多选筛选+「清除筛选」,新查询自动重置);**行内预览**:行尾「预览/收起」,新命令 `file_snippet` 读文件头 4KB——NUL 字节判二进制,UTF-8 失败按 GBK 兜底(同 read_text_file 策略),返回首个非空行(≤200 字),`.fs-preview` 展示;命中计数在筛选时显示「命中 N 条 · 筛选显示 M 条」
+- **剪贴板置顶**:按内容指纹(文本 djb2 哈希/图片宽高字节组合)存 `omnikit.clip.pins`(≤50 条),「置顶/已置顶」按钮,置顶排前且排序稳定(重启后内容重复制仍保持置顶语义);**托盘右键新增「剪贴板历史」**:恢复窗口并 `emit("omnikit://goto","clip")`,App.tsx listen 后切页
+- **日志级别着色**:logtail `levelOf` 正则识别 ERROR/FATAL/CRITICAL(红)/WARN/WARNING(黄)/DEBUG/TRACE(灰),兼容 [XX] 与 level=xx 写法;`.log-lv-*` 用新变量 `--log-err/--log-warn`(深浅主题各一套)
+- **检查更新**:Rust `update_check`(GitHub API `repos/Rosons/omnikit/releases/latest`,ureq 10s 超时,UA 随包版本 `concat!("OmniKit/",env!("CARGO_PKG_VERSION"))`;`version_gt` 逐段数字比较,有单测)+新命令 `open_url`(仅 http/https,Windows cmd start/macOS open)。设置页「更新」区:启动检查 Switch(`omnikit.update.auto`,默认开)+每天最多一次(`omnikit.update.last`),「立即检查」显示已最新/发现 vX,发现新版附「前往下载页」;App 启动静默检查(有新版才 toast)
+- **深浅色主题**:`:root` 浅色为基(补 `color-scheme: light`),`:root[data-theme="dark"]` 全套深色变量+对 30 余处硬编码色的覆盖(chip/徽标/滚动条/toast/开关/diff 词高亮/SQL prism 配色等);`src/lib/theme.ts`(模式存 localStorage `omnikit.theme`=system/light/dark,matchMedia 监听系统切换实时生效;main.tsx 引入即应用);**index.html 头部预置脚本在渲染前定主题+设深色底,防白闪**(applyTheme 同时维护 documentElement 背景内联样式);设置页新增「外观」区(跟随系统/浅色/深色 Dropdown)
+- **版本显示动态化**:侧栏 footer 与设置「关于」改用 `getVersion()`(来自 @tauri-apps/api/app,core:default 已放行),今后升版本不用改这两处文案
+- **错误日志落盘**:Rust `log_append`(追加 `%APPDATA%/logs/app.log`,超 512KB 轮转 .old;UTC 时间 civil_from_days 手写格式化,消息压成单行;级别白名单 error/warn/info)+ `open_log_dir`;ErrorBoundary `componentDidCatch` 上报 UI 崩溃栈,main.tsx 挂 window error/unhandledrejection 全局捕获(每次运行上限 50 条防刷屏);设置「关于」加「打开日志文件夹」
+- **v0.8.0 Release 多余文件根因与清理**:首轮 release 任务把 macOS `*.app` 目录当产物上传(upload-artifact 递归目录),`Info.plist`/`OmniKit`(Mach-O 主程序)/`OmniKit.icns` 混进 Release;d7255f1 已改过滤 `dist/*.exe`、`dist/*.dmg`,新版本不再出现;**存量 3 个资产已通过 GitHub REST API 删除**(本机无 gh CLI,用 `git credential fill` 取已存令牌调 releases/assets DELETE,需走代理 127.0.0.1:7890)
+- 新命令 5 个:file_snippet/update_check/open_url/open_log_dir/log_append(全部注册进 lib.rs invoke_handler);工具数量仍为 4 组 18 个
+- 教训:node(Windows)读不了 git-bash 的 /tmp 路径(curl -o /tmp/x 后 node require 失败),临时文件放项目目录;package.json 是 `"type": "module"`,tsc 编译出的 .js 会被 node 当 ESM(require 返回空 {}),一次性验证要复制成 .cjs 再跑
 
 ### 剩余手动验收(需真人操作)
 拖入文件夹 → 加密出 .box → 删除原文件 → 解密还原内容一致(加密引擎已被单测覆盖,此项主要验 UI 拖拽交互)

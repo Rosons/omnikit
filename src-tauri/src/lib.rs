@@ -13,7 +13,7 @@ mod unpack;
 use settings::SettingsState;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, RunEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent};
 
 use clip::ClipState;
 use mcp::McpState;
@@ -78,6 +78,11 @@ pub fn run() {
             commands::log_tail_stop,
             commands::path_exists,
             commands::read_file_base64,
+            commands::file_snippet,
+            commands::update_check,
+            commands::open_url,
+            commands::open_log_dir,
+            commands::log_append,
             settings::settings_get,
             settings::settings_set,
             clip::clip_list,
@@ -154,8 +159,9 @@ pub fn run() {
 
             // 系统托盘:左键恢复窗口,右键菜单
             let show = MenuItem::with_id(app, "show", "显示 OmniKit", true, None::<&str>)?;
+            let clip = MenuItem::with_id(app, "clip", "剪贴板历史", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &quit])?;
+            let menu = Menu::with_items(app, &[&show, &clip, &quit])?;
             TrayIconBuilder::with_id("main-tray")
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("OmniKit")
@@ -167,6 +173,14 @@ pub fn run() {
                             let _ = w.show();
                             let _ = w.set_focus();
                         }
+                    }
+                    // 托盘直达剪贴板历史:恢复窗口并通知前端切页
+                    "clip" => {
+                        if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.set_focus();
+                        }
+                        let _ = app.emit("omnikit://goto", "clip");
                     }
                     "quit" => app.exit(0),
                     _ => {}

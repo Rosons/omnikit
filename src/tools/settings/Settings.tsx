@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { tools } from "../registry";
 import { showToast } from "../../components/Toast";
 import Switch from "../../components/Switch";
 import Dropdown from "../../components/Dropdown";
+import { loadThemeMode, saveThemeMode, type ThemeMode } from "../../lib/theme";
 
 interface AppSettings {
   close_to_tray: boolean;
@@ -14,7 +16,16 @@ interface AppSettings {
   search_exclude_exts: string[];
 }
 
+interface UpdateInfo {
+  current: string;
+  latest: string;
+  notes: string;
+  url: string;
+  has_update: boolean;
+}
+
 const START_PAGE_KEY = "omnikit.startPage";
+const AUTO_UPDATE_KEY = "omnikit.update.auto";
 
 export default function Settings() {
   const [closeToTray, setCloseToTray] = useState(false);
@@ -24,6 +35,14 @@ export default function Settings() {
   const [searchExcludes, setSearchExcludes] = useState("");
   const [searchExts, setSearchExts] = useState("");
   const [startPage, setStartPage] = useState(localStorage.getItem(START_PAGE_KEY) ?? "last");
+  const [theme, setTheme] = useState<ThemeMode>(loadThemeMode);
+  const [version, setVersion] = useState("");
+  const [autoUpdate, setAutoUpdate] = useState(
+    localStorage.getItem(AUTO_UPDATE_KEY) !== "off",
+  );
+  const [checking, setChecking] = useState(false);
+  const [updateMsg, setUpdateMsg] = useState("");
+  const [updateUrl, setUpdateUrl] = useState("");
 
   useEffect(() => {
     invoke<AppSettings>("settings_get")
@@ -38,6 +57,7 @@ export default function Settings() {
     isEnabled()
       .then(setAutoStart)
       .catch(() => {});
+    getVersion().then(setVersion).catch(() => {});
   }, []);
 
   async function setClose(v: boolean) {
@@ -75,6 +95,38 @@ export default function Settings() {
     } catch (e) {
       showToast(String(e), "error");
     }
+  }
+
+  function setThemeMode(v: string) {
+    setTheme(v as ThemeMode);
+    saveThemeMode(v as ThemeMode);
+  }
+
+  function setAutoUpdateRun(v: boolean) {
+    setAutoUpdate(v);
+    localStorage.setItem(AUTO_UPDATE_KEY, v ? "on" : "off");
+  }
+
+  function checkUpdate() {
+    setChecking(true);
+    setUpdateMsg("");
+    setUpdateUrl("");
+    localStorage.setItem("omnikit.update.last", String(Date.now()));
+    invoke<UpdateInfo>("update_check")
+      .then((r) => {
+        if (r.has_update) {
+          setUpdateMsg(`发现新版本 v${r.latest}（当前 v${r.current}）`);
+          setUpdateUrl(r.url);
+        } else {
+          setUpdateMsg(`已是最新版本 v${r.current}`);
+        }
+      })
+      .catch((e) => setUpdateMsg(String(e)))
+      .finally(() => setChecking(false));
+  }
+
+  function goDownload() {
+    invoke("open_url", { url: updateUrl }).catch((e) => showToast(String(e), "error"));
   }
 
   function saveSearchRules() {
@@ -131,6 +183,30 @@ export default function Settings() {
       </div>
 
       <div className="field">
+        <span className="field-label">外观</span>
+        <div className="kv-list">
+          <div className="kv-row">
+            <span className="kv-k" style={{ minWidth: 170 }}>
+              界面主题
+            </span>
+            <span className="hint" style={{ flex: 1 }}>
+              跟随系统时，系统切换深浅色会实时同步
+            </span>
+            <Dropdown
+              width={140}
+              value={theme}
+              onChange={setThemeMode}
+              options={[
+                { value: "system", label: "跟随系统" },
+                { value: "light", label: "浅色" },
+                { value: "dark", label: "深色" },
+              ]}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="field">
         <span className="field-label">快捷键</span>
         <div className="kv-list">
           <div className="kv-row">
@@ -160,6 +236,37 @@ export default function Settings() {
                 [{ value: "last", label: "记住上次页面" }, ...tools.map((t) => ({ value: t.id, label: t.name }))]
               }
             />
+          </div>
+        </div>
+      </div>
+
+      <div className="field">
+        <span className="field-label">更新</span>
+        <div className="kv-list">
+          <div className="kv-row">
+            <span className="kv-k" style={{ minWidth: 170 }}>
+              启动时检查更新
+            </span>
+            <span className="hint" style={{ flex: 1 }}>
+              每天最多检查一次，只查询版本号，不上传任何数据
+            </span>
+            <Switch on={autoUpdate} onChange={setAutoUpdateRun} />
+          </div>
+          <div className="kv-row">
+            <span className="kv-k" style={{ minWidth: 170 }}>
+              检查更新
+            </span>
+            <span className="hint" style={{ flex: 1 }}>
+              {updateMsg || "手动查询 GitHub 上的最新发布版本"}
+            </span>
+            {updateUrl && (
+              <button className="btn btn-sm btn-primary" onClick={goDownload}>
+                前往下载页
+              </button>
+            )}
+            <button className="btn btn-sm" onClick={checkUpdate} disabled={checking}>
+              {checking ? "检查中…" : "立即检查"}
+            </button>
           </div>
         </div>
       </div>
@@ -212,9 +319,25 @@ export default function Settings() {
             <span className="kv-k" style={{ minWidth: 170 }}>
               OmniKit
             </span>
-            <span className="hint">
-              v0.8.0 · 百宝工具箱 · 全部功能本地处理，数据不出设备
+            <span className="hint" style={{ flex: 1 }}>
+              {version ? `v${version} · ` : ""}百宝工具箱 · 全部功能本地处理，数据不出设备
             </span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-k" style={{ minWidth: 170 }}>
+              运行日志
+            </span>
+            <span className="hint" style={{ flex: 1 }}>
+              页面异常会记录到本地日志文件，便于反馈排查
+            </span>
+            <button
+              className="btn btn-sm"
+              onClick={() =>
+                invoke("open_log_dir").catch((e) => showToast(String(e), "error"))
+              }
+            >
+              打开日志文件夹
+            </button>
           </div>
         </div>
       </div>

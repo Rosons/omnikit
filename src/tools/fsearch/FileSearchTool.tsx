@@ -18,6 +18,19 @@ interface DiskInfo {
   available: number;
 }
 
+interface Snippet {
+  snippet: string;
+  binary: boolean;
+  loading?: boolean;
+}
+
+/** 从完整路径取小写扩展名,无扩展名归为一类 */
+function extOf(p: string): string {
+  const base = p.split(/[\\/]/).pop() ?? p;
+  const dot = base.lastIndexOf(".");
+  return dot > 0 ? base.slice(dot + 1).toLowerCase() : "无后缀";
+}
+
 export default function FileSearchTool() {
   const [status, setStatus] = useState<SearchStatus | null>(null);
   const [disks, setDisks] = useState<DiskInfo[]>([]);
@@ -26,6 +39,9 @@ export default function FileSearchTool() {
   const [results, setResults] = useState<string[] | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [progress, setProgress] = useState<{ files: number; pct: number | null } | null>(null);
+  const [extFilter, setExtFilter] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [preview, setPreview] = useState<Map<string, Snippet>>(new Map());
   const rootsTouched = useRef(false);
   const qTimer = useRef<number | undefined>(undefined);
 
@@ -107,6 +123,7 @@ export default function FileSearchTool() {
     window.clearTimeout(qTimer.current);
     if (!query) {
       setResults(null);
+      setExtFilter(new Set());
       return;
     }
     qTimer.current = window.setTimeout(async () => {
@@ -116,13 +133,58 @@ export default function FileSearchTool() {
           limit: 300,
         });
         // stale 表示期间有更新的输入,后端仍在算,此时不动旧结果避免闪烁
-        if (!r.stale) setResults(r.lines);
+        if (!r.stale) {
+          setResults(r.lines);
+          setExtFilter(new Set());
+        }
       } catch (e) {
         showToast(String(e), "error", 5000);
       }
     }, 350);
     return () => window.clearTimeout(qTimer.current);
   }, [query]);
+
+  // 结果里的扩展名分布(取最多的 8 类做快捷筛选)
+  const extCounts = useMemo(() => {
+    if (!results || results.length === 0) return [];
+    const m = new Map<string, number>();
+    for (const p of results) {
+      const ext = extOf(p);
+      m.set(ext, (m.get(ext) ?? 0) + 1);
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+  }, [results]);
+
+  const shownResults = useMemo(() => {
+    if (!results || extFilter.size === 0) return results;
+    return results.filter((p) => extFilter.has(extOf(p)));
+  }, [results, extFilter]);
+
+  function toggleExt(ext: string) {
+    setExtFilter((s) => {
+      const n = new Set(s);
+      if (n.has(ext)) n.delete(ext);
+      else n.add(ext);
+      return n;
+    });
+  }
+
+  async function togglePreview(p: string) {
+    if (expanded === p) {
+      setExpanded(null);
+      return;
+    }
+    setExpanded(p);
+    if (!preview.has(p)) {
+      setPreview((m) => new Map(m).set(p, { snippet: "", binary: false, loading: true }));
+      try {
+        const r = await invoke<{ snippet: string; binary: boolean }>("file_snippet", { path: p });
+        setPreview((m) => new Map(m).set(p, { snippet: r.snippet, binary: r.binary }));
+      } catch {
+        setPreview((m) => new Map(m).set(p, { snippet: "", binary: false }));
+      }
+    }
+  }
 
   function reveal(path: string) {
     invoke("sb_reveal", { path }).catch(() => {});
@@ -218,24 +280,63 @@ export default function FileSearchTool() {
         </div>
       )}
 
-      {results && results.length === 0 && (
+      {shownResults && shownResults.length === 0 && (
         <div className="port-empty">
-          没有匹配的文件{status && status.files === 0 ? "（尚未建立索引）" : ""}
+          {extFilter.size > 0
+            ? "筛选后没有匹配的文件"
+            : `没有匹配的文件${status && status.files === 0 ? "（尚未建立索引）" : ""}`}
         </div>
       )}
-      {results && results.length > 0 && (
-        <div className="kv-list fs-list">
-          {results.map((p) => (
-            <div className="kv-row" key={p}>
-              <span className="kv-v kv-mono fs-path" title={p}>
-                {p}
-              </span>
-              <CopyButton text={p} label="复制" />
-              <button className="btn-text" onClick={() => reveal(p)}>
-                位置
-              </button>
-            </div>
+
+      {extCounts.length > 1 && shownResults && (
+        <div className="diff-opts">
+          {extCounts.map(([ext, n]) => (
+            <button
+              key={ext}
+              className={`opt-chip${extFilter.has(ext) ? " on" : ""}`}
+              onClick={() => toggleExt(ext)}
+            >
+              .{ext} · {n}
+            </button>
           ))}
+          {extFilter.size > 0 && (
+            <button className="btn-text" onClick={() => setExtFilter(new Set())}>
+              清除筛选
+            </button>
+          )}
+        </div>
+      )}
+
+      {shownResults && shownResults.length > 0 && (
+        <div className="kv-list fs-list">
+          {shownResults.map((p) => {
+            const info = preview.get(p);
+            return (
+              <div className="fs-item" key={p}>
+                <div className="kv-row">
+                  <span className="kv-v kv-mono fs-path" title={p}>
+                    {p}
+                  </span>
+                  <CopyButton text={p} label="复制" />
+                  <button className="btn-text" onClick={() => reveal(p)}>
+                    位置
+                  </button>
+                  <button className="btn-text" onClick={() => togglePreview(p)}>
+                    {expanded === p ? "收起" : "预览"}
+                  </button>
+                </div>
+                {expanded === p && (
+                  <div className="fs-preview">
+                    {info?.loading
+                      ? "读取中…"
+                      : info?.binary
+                        ? "二进制文件，不支持预览"
+                        : info?.snippet || "（空文件或无可显示文本）"}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -250,11 +351,13 @@ export default function FileSearchTool() {
           <span className="jwt-chip valid">索引正常</span>
         )}
         <span className="hint">{statusText}</span>
-        {results && (
+        {shownResults && (
           <span className="hint">
-            {results.length >= 300
-              ? "命中 300+ 条（仅显示前 300）"
-              : `命中 ${results.length} 条`}
+            {extFilter.size > 0
+              ? `命中 ${results?.length ?? 0} 条 · 筛选显示 ${shownResults.length} 条`
+              : shownResults.length >= 300
+                ? "命中 300+ 条（仅显示前 300）"
+                : `命中 ${shownResults.length} 条`}
           </span>
         )}
         <div style={{ flex: 1 }} />

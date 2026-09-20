@@ -33,7 +33,7 @@ pub(crate) fn hidden_command(program: &str) -> Command {
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use walkdir::WalkDir;
 use zeroize::Zeroizing;
 
@@ -927,7 +927,7 @@ pub async fn http_request(
         }
         let mut req = ureq::request(&upper, url.trim())
             .timeout(Duration::from_secs(30))
-            .set("User-Agent", "OmniKit/0.8");
+            .set("User-Agent", concat!("OmniKit/", env!("CARGO_PKG_VERSION")));
         for (k, v) in &headers {
             let k = k.trim();
             let v = v.trim();
@@ -1581,6 +1581,213 @@ pub async fn read_file_base64(path: String) -> Result<FileB64, String> {
     .map_err(|e| format!("任务执行失败：{e}"))?
 }
 
+/* ---------- 通用:打开链接/日志目录、文件片段预览、检查更新、前端错误日志 ---------- */
+
+/// 用系统默认浏览器打开 http(s) 链接
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), String> {
+    let url = url.trim();
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err(format!("仅支持打开 http(s) 链接：{url}"));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        hidden_command("cmd")
+            .args(["/c", "start", "", url])
+            .spawn()
+            .map_err(|e| format!("打开失败：{e}"))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        hidden_command("open")
+            .arg(url)
+            .spawn()
+            .map_err(|e| format!("打开失败：{e}"))?;
+    }
+    Ok(())
+}
+
+/// 打开应用数据目录下的 logs 目录(存放前端错误日志)
+#[tauri::command]
+pub fn open_log_dir(app: AppHandle) -> Result<(), String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("无法定位数据目录：{e}"))?
+        .join("logs");
+    let _ = fs::create_dir_all(&dir);
+    #[cfg(target_os = "windows")]
+    {
+        hidden_command("explorer")
+            .arg(dir.as_os_str())
+            .spawn()
+            .map_err(|e| format!("打开失败：{e}"))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        hidden_command("open")
+            .arg(&dir)
+            .spawn()
+            .map_err(|e| format!("打开失败：{e}"))?;
+    }
+    Ok(())
+}
+
+/// 文件搜索的行内预览:读文件头部 4KB,返回首个非空行;二进制文件不给片段
+#[derive(Serialize)]
+pub struct FileSnippet {
+    pub snippet: String,
+    pub binary: bool,
+}
+
+#[tauri::command]
+pub async fn file_snippet(path: String) -> Result<FileSnippet, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut f = fs::File::open(&path).map_err(|e| format!("无法读取文件：{e}"))?;
+        let mut buf = [0u8; 4096];
+        let n = f.read(&mut buf).map_err(|e| format!("无法读取文件：{e}"))?;
+        let head = &buf[..n];
+        if head.contains(&0) {
+            return Ok(FileSnippet { snippet: String::new(), binary: true });
+        }
+        // UTF-8 优先,解码失败按 GBK 兜底,与 read_text_file 同策略
+        let (text, _, had_errors) = encoding_rs::UTF_8.decode(head);
+        let text = if had_errors {
+            let (t, _, _) = encoding_rs::GBK.decode(head);
+            t
+        } else {
+            text
+        };
+        let snippet = text
+            .lines()
+            .map(str::trim)
+            .find(|l| !l.is_empty())
+            .unwrap_or("")
+            .chars()
+            .take(200)
+            .collect::<String>();
+        Ok(FileSnippet { snippet, binary: false })
+    })
+    .await
+    .map_err(|e| format!("任务执行失败：{e}"))?
+}
+
+#[derive(Serialize)]
+pub struct UpdateInfo {
+    pub current: String,
+    pub latest: String,
+    pub notes: String,
+    pub url: String,
+    pub has_update: bool,
+}
+
+/// 查询 GitHub 最新 Release 与当前版本比较;只做提示,不自动替换文件
+#[tauri::command]
+pub async fn update_check() -> Result<UpdateInfo, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let current = env!("CARGO_PKG_VERSION").to_string();
+        let resp = ureq::get("https://api.github.com/repos/Rosons/omnikit/releases/latest")
+            .timeout(Duration::from_secs(10))
+            .set("User-Agent", "OmniKit/update-check")
+            .set("Accept", "application/vnd.github+json")
+            .call()
+            .map_err(|e| format!("网络请求失败：{e}"))?;
+        let mut body = String::new();
+        resp.into_reader()
+            .take(2 * 1024 * 1024)
+            .read_to_string(&mut body)
+            .map_err(|e| format!("读取响应失败：{e}"))?;
+        let v: serde_json::Value =
+            serde_json::from_str(&body).map_err(|e| format!("解析响应失败：{e}"))?;
+        let latest = v["tag_name"]
+            .as_str()
+            .unwrap_or("")
+            .trim_start_matches('v')
+            .trim()
+            .to_string();
+        if latest.is_empty() {
+            return Err("未获取到最新版本号".into());
+        }
+        Ok(UpdateInfo {
+            has_update: version_gt(&latest, &current),
+            current,
+            latest,
+            url: v["html_url"].as_str().unwrap_or("").to_string(),
+            notes: v["body"].as_str().unwrap_or("").chars().take(500).collect(),
+        })
+    })
+    .await
+    .map_err(|e| format!("任务执行失败：{e}"))?
+}
+
+/// 版本号比较:按点分段取数字,段数不足补 0,只支持纯数字段
+fn version_gt(a: &str, b: &str) -> bool {
+    let parse = |s: &str| -> Vec<u64> {
+        s.split('.')
+            .map(|p| p.trim().parse::<u64>().unwrap_or(0))
+            .collect()
+    };
+    let (pa, pb) = (parse(a), parse(b));
+    for i in 0..3 {
+        let x = pa.get(i).copied().unwrap_or(0);
+        let y = pb.get(i).copied().unwrap_or(0);
+        if x != y {
+            return x > y;
+        }
+    }
+    false
+}
+
+/// 前端错误日志落盘:追加到 app_data/logs/app.log;超过 512KB 轮转为 .old。
+/// 时间为 UTC,仅供排障参考。
+#[tauri::command]
+pub fn log_append(app: AppHandle, level: String, source: String, message: String) {
+    use std::io::Write as _;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let level = if matches!(level.as_str(), "error" | "warn" | "info") {
+        level
+    } else {
+        "info".into()
+    };
+    let Ok(dir) = app.path().app_data_dir() else { return };
+    let dir = dir.join("logs");
+    if fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let log = dir.join("app.log");
+    if let Ok(meta) = fs::metadata(&log) {
+        if meta.len() > 512 * 1024 {
+            let _ = fs::rename(&log, dir.join("app.log.old"));
+        }
+    }
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let time = format_log_time(secs);
+    // 压成单行,保持日志文件逐行可读
+    let message = message.replace(['\r', '\n'], " ");
+    if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(&log) {
+        let _ = writeln!(f, "{time} [{level}] {source} {message}");
+    }
+}
+
+/// Unix 秒转 "YYYY-MM-DD HH:MM:SS"(UTC),civil_from_days 算法
+fn format_log_time(secs: u64) -> String {
+    let days = (secs / 86400) as i64;
+    let rem = secs % 86400;
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { yoe + era * 400 + 1 } else { yoe + era * 400 };
+    format!("{y:04}-{m:02}-{d:02} {:02}:{:02}:{:02}", rem / 3600, (rem % 3600) / 60, rem % 60)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1604,6 +1811,16 @@ mod tests {
         );
         assert_eq!(r.size, 3);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn version_compare() {
+        assert!(version_gt("0.9.0", "0.8.0"));
+        assert!(version_gt("0.10.0", "0.9.9"));
+        assert!(version_gt("1.0", "0.99.99"));
+        assert!(!version_gt("0.8.0", "0.8.0"));
+        assert!(!version_gt("0.8", "0.8.1"));
+        assert!(!version_gt("abc", "0.1.0"));
     }
 
     #[test]

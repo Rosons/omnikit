@@ -4,6 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OmniKit</title>
+    <script>
+      // 渲染前定主题,避免深色用户看到白底闪屏
+      (function () {
+        var mode = "system";
+        try { mode = localStorage.getItem("omnikit.theme") || "system"; } catch (e) {}
+        var dark =
+          mode === "dark" ||
+          (mode !== "light" &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) {
+          document.documentElement.dataset.theme = "dark";
+          document.documentElement.style.background = "#12151b";
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

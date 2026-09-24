@@ -16,8 +16,8 @@ use tauri::{AppHandle, Manager};
 const MAX_ITEMS: usize = 500;
 const MAX_TEXT: usize = 1024 * 1024;
 const MAX_PIXELS: usize = 16_000_000;
-/// 落盘文件大小上限,超出时从最旧开始丢弃
-const FILE_MAX: usize = 32 * 1024 * 1024;
+/// 落盘文件大小上限,超出时从最旧丢弃 10% 再存(滚动保留最新)
+const FILE_MAX: usize = 256 * 1024 * 1024;
 /// 落盘节流:有新记录后至少间隔这么久才写一次盘
 const SAVE_INTERVAL: u64 = 3;
 
@@ -193,6 +193,16 @@ fn save_now(app: &AppHandle) {
     st.dirty.store(false, Ordering::Relaxed);
 }
 
+/// 从磁盘读取加密历史;文件不存在、密钥不可用或解密失败时返回 None
+fn load_from_disk(app: &AppHandle) -> Option<Vec<ClipItem>> {
+    let st = app.state::<ClipState>();
+    let key = cached_key(&st)?;
+    let path = clip_file(app)?;
+    let blob = std::fs::read(&path).ok()?;
+    let json = decrypt(&key, &blob).ok()?;
+    serde_json::from_slice::<ClipFile>(&json).ok().map(|f| f.items)
+}
+
 /// 启动时恢复:读到历史后回填内存,续上 id 序列
 pub fn clip_init(app: &AppHandle) {
     let st = app.state::<ClipState>();
@@ -201,19 +211,13 @@ pub fn clip_init(app: &AppHandle) {
     if !st.persist.load(Ordering::Relaxed) {
         return;
     }
-    let Some(key) = cached_key(&st) else {
+    if cached_key(&st).is_none() {
         eprintln!("[clip] 无法获取系统凭据库密钥，本次运行不落盘");
         return;
-    };
-    let Some(path) = clip_file(app) else { return };
-    let Ok(blob) = std::fs::read(&path) else { return };
-    let Ok(json) = decrypt(&key, &blob) else {
-        eprintln!("[clip] 历史文件解密失败，忽略");
-        return;
-    };
-    if let Ok(file) = serde_json::from_slice::<ClipFile>(&json) {
+    }
+    if let Some(restored) = load_from_disk(app) {
         let mut items = st.items.lock().unwrap();
-        *items = file.items;
+        *items = restored;
         items.truncate(MAX_ITEMS);
         let max_id = items.first().map(|i| i.id).unwrap_or(0);
         st.next_id.store(max_id + 1, Ordering::Relaxed);
@@ -401,7 +405,8 @@ pub fn clip_remove(state: tauri::State<'_, ClipState>, app: AppHandle, id: u64) 
     Ok(())
 }
 
-/// 切换加密落盘:关闭时删除历史文件,开启时立即写一次盘
+/// 切换加密落盘:关闭只停写、文件保留(删除靠清空);开启时立即写一次盘,
+/// 内存为空但磁盘有历史(重启前关过落盘)则先恢复回来,避免覆盖旧数据
 #[tauri::command]
 pub fn clip_set_persist(state: tauri::State<'_, ClipState>, app: AppHandle, persist: bool) -> Result<(), String> {
     state.persist.store(persist, Ordering::Relaxed);
@@ -414,9 +419,16 @@ pub fn clip_set_persist(state: tauri::State<'_, ClipState>, app: AppHandle, pers
         *st.0.lock().unwrap() = s;
     }
     if persist {
+        if state.items.lock().unwrap().is_empty() {
+            if let Some(restored) = load_from_disk(&app) {
+                let mut items = state.items.lock().unwrap();
+                *items = restored;
+                items.truncate(MAX_ITEMS);
+                let max_id = items.first().map(|i| i.id).unwrap_or(0);
+                state.next_id.store(max_id + 1, Ordering::Relaxed);
+            }
+        }
         save_now(&app);
-    } else if let Some(path) = clip_file(&app) {
-        let _ = std::fs::remove_file(path);
     }
     Ok(())
 }

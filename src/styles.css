@@ -548,6 +548,15 @@ body {
 }
 /* 子页 Tab 放在弹性列容器里时不被拉伸成整行 */
 .seg.seg-sm { align-self: flex-start; margin-bottom: var(--sp-4); }
+/* 数据工具箱:12 个子工具按 4 组排列,组间竖线分隔 */
+.dev-tabs .dev-tab-cell { display: inline-flex; align-items: center; }
+.dev-tabs .dev-tab-sep {
+  width: 1px;
+  height: 14px;
+  margin: 0 7px;
+  background: var(--border-strong);
+  align-self: center;
+}
 
 .seg-btn {
   padding: 6px 20px;

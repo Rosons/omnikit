@@ -64,7 +64,7 @@ export function UrlTool() {
           </div>
           {params.length > 0 && (
             <div className="field">
-              <span className="field-label">查询参数（{params.length} 个，已自动解码）</span>
+              <span className="field-label">查询参数（{params.length} 个）</span>
               <div className="kv-list">
                 {params.map(([k, v]) => (
                   <div className="kv-row" key={k}>
@@ -160,8 +160,7 @@ export function TextBatchTool() {
   return (
     <div className="stack">
       <div className="field">
-        <span className="field-label">文本（每行一条，点操作按钮立即生效，可撤销）</span>
-        <span className="hint">按行批量整理文本，适合清洗名单、日志、导入数据前的准备</span>
+        <span className="field-label">文本（每行一条）</span>
         <textarea
           className="textarea input-mono"
           style={{ height: 260 }}
@@ -231,13 +230,12 @@ export function RadixTool() {
   return (
     <div className="stack">
       <div className="field">
-        <span className="field-label">输入（非负整数，选当前进制）</span>
-        <span className="hint">二、八、十、十六进制之间互转，输入后自动出结果</span>
+        <span className="field-label">输入</span>
         <input
           className={`input input-mono${t && !valid ? " input-error" : ""}`}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="如 255 或 FF"
+          placeholder="非负整数，如 255 或 FF"
           spellCheck={false}
         />
         <div className="diff-opts">
@@ -473,7 +471,7 @@ export function ConfTool() {
     <div className="stack">
       <div className="field">
         <span className="field-label">配置转换</span>
-        <span className="hint">YAML、JSON 与 Java properties 三种格式互转；properties 的点号键（如 a.b.c）会按层级拆解或合并</span>
+          <span className="hint">YAML、JSON、properties 互转；properties 点号键按层级拆解</span>
         <div className="diff-opts">
           {CONF_MODES.map((m) => (
             <button key={m.k} className={`opt-chip${mode === m.k ? " on" : ""}`} onClick={() => setMode(m.k)}>

@@ -14,18 +14,21 @@ import { UrlTool, TextBatchTool, RadixTool, FileB64Tool, ConfTool } from "./more
 
 const TABS = [
   { id: "json", name: "JSON" },
-  { id: "time", name: "时间戳" },
+  { id: "sql", name: "SQL" },
+  { id: "conf", name: "配置" },
   { id: "codec", name: "编解码" },
-  { id: "uuid", name: "UUID" },
+  { id: "b64", name: "Base64" },
+  { id: "url", name: "URL" },
   { id: "hash", name: "哈希" },
   { id: "jwt", name: "JWT" },
-  { id: "sql", name: "SQL" },
-  { id: "url", name: "URL" },
-  { id: "text", name: "批处理" },
+  { id: "uuid", name: "UUID" },
+  { id: "time", name: "时间戳" },
   { id: "radix", name: "进制" },
-  { id: "b64", name: "Base64" },
-  { id: "conf", name: "配置" },
+  { id: "text", name: "批处理" },
 ] as const;
+
+/** 组间竖线插入的位置(按上面顺序 3/6/9 个一组:数据、编码、校验、转换) */
+const TAB_BREAKS = [3, 6, 9];
 
 type TabId = (typeof TABS)[number]["id"];
 
@@ -33,15 +36,17 @@ export default function DevTools() {
   const [tab, setTab] = useState<TabId>("json");
   return (
     <div>
-      <div className="seg" role="tablist">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            className={`seg-btn${tab === t.id ? " active" : ""}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.name}
-          </button>
+      <div className="seg dev-tabs" role="tablist">
+        {TABS.map((t, i) => (
+          <span key={t.id} className="dev-tab-cell">
+            {TAB_BREAKS.includes(i) && <span className="dev-tab-sep" aria-hidden />}
+            <button
+              className={`seg-btn${tab === t.id ? " active" : ""}`}
+              onClick={() => setTab(t.id)}
+            >
+              {t.name}
+            </button>
+          </span>
         ))}
       </div>
       {tab === "json" && <JsonTool />}
@@ -193,12 +198,12 @@ function TimeTool() {
       </div>
 
       <div className="field">
-        <span className="field-label">时间戳 → 日期（10 位秒 / 13 位毫秒，自动识别）</span>
+        <span className="field-label">时间戳 → 日期</span>
         <input
           className="input input-mono"
           value={stamp}
           onChange={(e) => setStamp(e.target.value)}
-          placeholder="如 1789065600"
+          placeholder="10 位秒 / 13 位毫秒均可，如 1789065600"
           spellCheck={false}
         />
       </div>
@@ -540,12 +545,12 @@ function FileHashView({ active }: { active: boolean }) {
       </div>
 
       <div className="field">
-        <span className="field-label">期望哈希值（可选，粘贴官方校验值自动比对）</span>
+        <span className="field-label">期望哈希值</span>
         <input
           className="input input-mono"
           value={expected}
           onChange={(e) => setExpected(e.target.value)}
-          placeholder="如 5d41402abc4b2a76b9719d911017c592"
+          placeholder="可选，粘贴官方校验值自动比对，如 5d41402abc4b2a76b9719d911017c592"
           spellCheck={false}
         />
         {compare && (
@@ -623,7 +628,7 @@ function TextHashView() {
   return (
     <div className="stack">
       <div className="field">
-        <span className="field-label">输入文本（按 UTF-8 计算）</span>
+        <span className="field-label">输入文本</span>
         <textarea
           className="textarea"
           value={input}
@@ -715,13 +720,13 @@ function JwtTool() {
   return (
     <div className="stack">
       <div className="field">
-        <span className="field-label">JWT 令牌（支持 Bearer 前缀；仅解码内容，不校验签名）</span>
+        <span className="field-label">JWT 令牌</span>
         <textarea
           className="textarea input-mono"
           style={{ height: 96 }}
           value={token}
           onChange={(e) => setToken(e.target.value)}
-          placeholder="粘贴 eyJ 开头的令牌"
+          placeholder="粘贴 eyJ 开头的令牌，支持 Bearer 前缀"
           spellCheck={false}
         />
       </div>

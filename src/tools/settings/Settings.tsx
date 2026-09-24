@@ -445,7 +445,7 @@ export default function Settings() {
               导出设置
             </span>
             <span className="hint" style={{ flex: 1 }}>
-              把 HTTP 历史、环境变量、MCP 服务器等本地配置存成 JSON；MCP 请求头可能存有令牌，请妥善保管导出文件
+              配置存为 JSON 文件；可能含 MCP 令牌，注意保管
             </span>
             <button className="btn btn-sm" onClick={doExport}>
               导出…
@@ -456,7 +456,7 @@ export default function Settings() {
               导入设置
             </span>
             <span className="hint" style={{ flex: 1 }}>
-              从备份文件恢复，同名配置会被覆盖，导入后自动刷新
+              从 JSON 备份恢复，覆盖同名配置
             </span>
             <button className="btn btn-sm" onClick={doImport}>
               导入…

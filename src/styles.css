@@ -1612,9 +1612,6 @@ body {
 }
 .http-body-input { min-height: 46px; }
 .http-row { display: flex; align-items: center; gap: 10px; }
-.http-row .seg { margin-bottom: 0; flex: none; }
-.http-method { padding: 2px; }
-.http-method .seg-btn { padding: 3px 12px; font-size: 12.5px; }
 .http-url { flex: 1; min-width: 0; }
 .http-header-row {
   display: flex;

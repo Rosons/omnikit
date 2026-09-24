@@ -6,6 +6,7 @@ import { showToast } from "../../components/Toast";
 import Switch from "../../components/Switch";
 import { parseCurl } from "../../lib/curl";
 import { fmtBytes } from "../../lib/format";
+import Dropdown from "../../components/Dropdown";
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"] as const;
 type Method = (typeof METHODS)[number];
@@ -227,17 +228,12 @@ export default function HttpTool() {
     <div className="stack http-page">
       <div className="field http-flex-none">
         <div className="http-row">
-          <div className="seg seg-sm http-method" role="tablist">
-            {METHODS.map((m) => (
-              <button
-                key={m}
-                className={`seg-btn${method === m ? " active" : ""}`}
-                onClick={() => setMethod(m)}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
+          <Dropdown
+            width={104}
+            value={method}
+            onChange={(v) => setMethod(v as Method)}
+            options={METHODS.map((m) => ({ value: m, label: m }))}
+          />
           <input
             className="input input-sm input-mono http-url"
             value={url}

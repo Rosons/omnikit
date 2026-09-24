@@ -258,6 +258,9 @@ body {
   object-fit: contain;
 }
 .clip-row .btn-text { flex: none; }
+/* 文本行靠 .clip-text 的 flex:1 占满,图片行中间宽度不定;元信息自动靠右,
+   保证尺寸/时间与三个操作按钮在两种行里位置一致 */
+.clip-row .kv-k { margin-left: auto; }
 
 /* ===== 文件搜索 ===== */
 .fsearch-page { min-height: 320px; }

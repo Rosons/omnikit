@@ -917,6 +917,7 @@ pub async fn http_request(
     url: String,
     headers: Vec<(String, String)>,
     body: Option<String>,
+    timeout_secs: Option<u64>,
 ) -> Result<HttpResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         if url.trim().is_empty() {
@@ -926,8 +927,9 @@ pub async fn http_request(
         if !matches!(upper.as_str(), "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD") {
             return Err(format!("不支持的方法：{method}"));
         }
+        let timeout = Duration::from_secs(timeout_secs.unwrap_or(30).clamp(1, 300));
         let mut req = ureq::request(&upper, url.trim())
-            .timeout(Duration::from_secs(30))
+            .timeout(timeout)
             .set("User-Agent", concat!("OmniKit/", env!("CARGO_PKG_VERSION")));
         for (k, v) in &headers {
             let k = k.trim();
@@ -1622,7 +1624,7 @@ pub async fn updater_download(app: AppHandle) -> Result<(), String> {
         .updater_builder()
         .build()
         .map_err(|e| format!("更新器初始化失败：{e}"))?;
-    let mut upd = updater
+    let upd = updater
         .check()
         .await
         .map_err(|e| format!("更新检查失败：{e}"))?

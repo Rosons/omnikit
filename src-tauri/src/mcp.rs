@@ -781,3 +781,48 @@ pub fn mcp_log(state: tauri::State<'_, McpState>) -> Result<Vec<String>, String>
     let log = sess.log().lock().unwrap().clone();
     Ok(log)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_endpoint;
+
+    #[test]
+    fn 绝对地址原样返回() {
+        assert_eq!(
+            resolve_endpoint("https://mcp.example.com/sse", "https://other.host/msg?a=1"),
+            "https://other.host/msg?a=1"
+        );
+        assert_eq!(
+            resolve_endpoint("https://mcp.example.com/sse", "http://127.0.0.1:3000/m"),
+            "http://127.0.0.1:3000/m"
+        );
+    }
+
+    #[test]
+    fn 相对路径拼到主机根() {
+        // base 带路径时,endpoint 挂在主机根而不是 base 路径下
+        assert_eq!(
+            resolve_endpoint("https://mcp.example.com/sse", "/message?sessionId=abc"),
+            "https://mcp.example.com/message?sessionId=abc"
+        );
+    }
+
+    #[test]
+    fn 主机地址无路径时直接拼接() {
+        assert_eq!(
+            resolve_endpoint("http://127.0.0.1:8080", "/msg"),
+            "http://127.0.0.1:8080/msg"
+        );
+    }
+
+    #[test]
+    fn 带端口与子路径的主机() {
+        assert_eq!(
+            resolve_endpoint(
+                "https://gw.corp.example.com:8443/api/sse",
+                "/api/message?sid=1"
+            ),
+            "https://gw.corp.example.com:8443/api/message?sid=1"
+        );
+    }
+}

@@ -13,6 +13,7 @@ type Method = (typeof METHODS)[number];
 const HIST_KEY = "omnikit.http.history";
 const ENV_KEY = "omnikit.http.env";
 const RECORD_KEY = "omnikit.http.record";
+const TIMEOUT_KEY = "omnikit.http.timeout";
 const HIST_MAX = 50;
 
 interface HttpResult {
@@ -75,6 +76,11 @@ export default function HttpTool() {
   const [hist, setHist] = useState<HistEntry[]>([]);
   // 请求历史记录开关(默认开;关掉后发送不落任何历史)
   const [record, setRecord] = useState(() => localStorage.getItem(RECORD_KEY) !== "off");
+  // 超时秒数(1~300,默认 30)
+  const [timeoutSecs, setTimeoutSecs] = useState(() => {
+    const n = Number(localStorage.getItem(TIMEOUT_KEY));
+    return Number.isFinite(n) && n >= 1 && n <= 300 ? Math.round(n) : 30;
+  });
 
   useEffect(() => {
     try {
@@ -125,6 +131,7 @@ export default function HttpTool() {
         url: applyEnv(url.trim(), envRows),
         headers: realHeaders,
         body: method === "GET" || method === "HEAD" ? null : applyEnv(body, envRows),
+        timeoutSecs,
       });
       setRes(r);
       if (record) {
@@ -269,6 +276,28 @@ export default function HttpTool() {
         <span className="kv-k" style={{ marginLeft: 4 }}>
           记录历史
           <Switch on={record} onChange={setRecordRun} />
+        </span>
+        <span className="kv-k" style={{ marginLeft: 12 }}>
+          超时
+          <input
+            className="input input-sm"
+            style={{ width: 62, marginLeft: 6 }}
+            type="number"
+            min={1}
+            max={300}
+            value={timeoutSecs}
+            title="请求超时秒数（1～300）"
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (Number.isFinite(n)) setTimeoutSecs(Math.round(n));
+            }}
+            onBlur={() => {
+              const v = Math.min(300, Math.max(1, timeoutSecs || 30));
+              setTimeoutSecs(v);
+              localStorage.setItem(TIMEOUT_KEY, String(v));
+            }}
+          />
+          秒
         </span>
         {!record && <span className="hint">已暂停记录，发送过的请求不保留</span>}
       </div>

@@ -121,13 +121,23 @@ export default function App() {
     const last = Number(localStorage.getItem(KEY_LAST) ?? 0);
     if (Date.now() - last < 24 * 3600 * 1000) return;
     localStorage.setItem(KEY_LAST, String(Date.now()));
-    invoke<{ has_update: boolean; latest: string }>("update_check")
+    invoke<{ has_update: boolean; latest: string; current: string }>("update_check")
       .then((r) => {
+        const msg = r.has_update ? `发现新版本 v${r.latest}` : `已是最新版本 v${r.current}`;
+        localStorage.setItem(
+          "omnikit.update.lastResult",
+          JSON.stringify({ t: Date.now(), ok: true, msg }),
+        );
         if (r.has_update) {
           showToast(`发现新版本 v${r.latest}，可在设置页查看并前往下载`, "info", 6000);
         }
       })
-      .catch(() => {});
+      .catch((e) => {
+        localStorage.setItem(
+          "omnikit.update.lastResult",
+          JSON.stringify({ t: Date.now(), ok: false, msg: String(e).slice(0, 300) }),
+        );
+      });
   }, []);
 
   function openTool(id: string) {

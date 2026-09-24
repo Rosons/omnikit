@@ -27,6 +27,8 @@ for (const f of files) {
     let t = line;
     if (f.endsWith(".rs")) {
       t = t.replace(/\/\/.*$/, "");
+      // fn 签名行是代码标识符(如中文测试名),不是文案,跳过
+      if (/^\s*(pub\s+)?(async\s+)?fn\s/.test(t)) return;
     } else {
       t = t.replace(/(^|\s)\/\/[^/].*$/, "$1");
     }

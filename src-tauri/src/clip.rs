@@ -420,3 +420,57 @@ pub fn clip_set_persist(state: tauri::State<'_, ClipState>, app: AppHandle, pers
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{decrypt, encrypt};
+    use rand::rngs::OsRng;
+    use rand::RngCore;
+
+    fn test_key() -> [u8; 32] {
+        let mut k = [0u8; 32];
+        OsRng.fill_bytes(&mut k);
+        k
+    }
+
+    #[test]
+    fn 加密解密往返() {
+        let key = test_key();
+        for plain in [&b"hello"[..], "中文剪贴板内容，含全角标点。".as_bytes(), &[0u8, 1, 2, 255][..]] {
+            let ct = encrypt(&key, plain).unwrap();
+            // 密文 = 12 字节 nonce + 密文体,不应等于明文
+            assert!(ct.len() > plain.len() + 12);
+            assert_ne!(&ct[12..], plain);
+            assert_eq!(decrypt(&key, &ct).unwrap(), plain);
+        }
+    }
+
+    #[test]
+    fn 同一明文两次加密的随机nonce不同() {
+        let key = test_key();
+        let c1 = encrypt(&key, b"same").unwrap();
+        let c2 = encrypt(&key, b"same").unwrap();
+        assert_ne!(c1, c2);
+    }
+
+    #[test]
+    fn 错误密钥解不开() {
+        let ct = encrypt(&test_key(), b"secret").unwrap();
+        assert!(decrypt(&test_key(), &ct).is_err());
+    }
+
+    #[test]
+    fn 篡改密文解不开() {
+        let key = test_key();
+        let mut ct = encrypt(&key, b"payload").unwrap();
+        let last = ct.len() - 1;
+        ct[last] ^= 0x01;
+        assert!(decrypt(&key, &ct).is_err());
+    }
+
+    #[test]
+    fn 过短密文直接报错() {
+        assert!(decrypt(&test_key(), &[0u8; 12]).is_err());
+        assert!(decrypt(&test_key(), &[0u8; 5]).is_err());
+    }
+}

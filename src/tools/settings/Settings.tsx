@@ -3,11 +3,13 @@ import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { tools } from "../registry";
 import { showToast } from "../../components/Toast";
 import Switch from "../../components/Switch";
 import Dropdown from "../../components/Dropdown";
 import { loadThemeMode, saveThemeMode, type ThemeMode } from "../../lib/theme";
+import { applyBackup, collectBackup } from "../../lib/backup";
 
 interface AppSettings {
   close_to_tray: boolean;
@@ -27,6 +29,30 @@ interface UpdateInfo {
 
 const START_PAGE_KEY = "omnikit.startPage";
 const AUTO_UPDATE_KEY = "omnikit.update.auto";
+const LAST_RESULT_KEY = "omnikit.update.lastResult";
+
+interface UpdateLastResult {
+  t: number;
+  ok: boolean;
+  msg: string;
+}
+
+function loadLastResult(): UpdateLastResult | null {
+  try {
+    const raw = localStorage.getItem(LAST_RESULT_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (o && typeof o.t === "number" && typeof o.msg === "string") return o;
+  } catch {
+    /* 忽略坏数据 */
+  }
+  return null;
+}
+
+function saveLastResult(ok: boolean, msg: string) {
+  const r: UpdateLastResult = { t: Date.now(), ok, msg };
+  localStorage.setItem(LAST_RESULT_KEY, JSON.stringify(r));
+}
 
 interface UpdaterAvail {
   current: string;
@@ -54,6 +80,7 @@ export default function Settings() {
   const [updater, setUpdater] = useState<UpdaterAvail | null>(null);
   const [dlMsg, setDlMsg] = useState("");
   const [pluginErr, setPluginErr] = useState("");
+  const [lastResult, setLastResult] = useState<UpdateLastResult | null>(loadLastResult);
 
   useEffect(() => {
     invoke<AppSettings>("settings_get")
@@ -138,15 +165,19 @@ export default function Settings() {
     setPluginErr("");
     localStorage.setItem("omnikit.update.last", String(Date.now()));
     (async () => {
-      // 先走更新器插件(读 Release 的 latest.json,可应用内安装;失败多半是 github.com 直连不通,可配代理)
+      // 先走更新器插件(读 Release 的 latest.json,可应用内安装;失败多半是 github.com 直连不通)
       try {
         const avail = await invoke<UpdaterAvail | null>("updater_check");
+        let msg: string;
         if (avail) {
           setUpdater(avail);
-          setUpdateMsg(`发现新版本 v${avail.version}（当前 v${avail.current}）`);
+          msg = `发现新版本 v${avail.version}（当前 v${avail.current}）`;
         } else {
-          setUpdateMsg(`已是最新版本 v${version || "…"}`);
+          msg = `已是最新版本 v${version || "…"}`;
         }
+        setUpdateMsg(msg);
+        saveLastResult(true, msg);
+        setLastResult(loadLastResult());
         return;
       } catch (e) {
         setPluginErr(String(e));
@@ -159,20 +190,26 @@ export default function Settings() {
       // 退回 GitHub API 版本比较(api.github.com 直连可用)
       try {
         const r = await invoke<UpdateInfo>("update_check");
+        let msg: string;
         if (r.has_update) {
-          setUpdateMsg(`发现新版本 v${r.latest}（当前 v${r.current}）`);
+          msg = `发现新版本 v${r.latest}（当前 v${r.current}）`;
           setUpdateUrl(r.url);
         } else {
-          setUpdateMsg(`已是最新版本 v${r.current}`);
+          msg = `已是最新版本 v${r.current}`;
         }
+        setUpdateMsg(msg);
+        saveLastResult(true, msg);
       } catch (e) {
-        setUpdateMsg(String(e));
+        const msg = String(e);
+        setUpdateMsg(msg);
+        saveLastResult(false, msg);
         invoke("log_append", {
           level: "warn",
           source: "updater",
-          message: `检查更新失败：${String(e)}`.slice(0, 400),
+          message: `检查更新失败：${msg}`.slice(0, 400),
         }).catch(() => {});
       }
+      setLastResult(loadLastResult());
     })().finally(() => setChecking(false));
   }
 
@@ -195,6 +232,49 @@ export default function Settings() {
 
   function goDownload() {
     invoke("open_url", { url: updateUrl }).catch((e) => showToast(String(e), "error"));
+  }
+
+  function fmtResultTime(t: number): string {
+    const d = new Date(t);
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  async function doExport() {
+    try {
+      const path = await save({
+        title: "导出 OmniKit 设置",
+        defaultPath: "omnikit-settings.json",
+        filters: [{ name: "JSON 文件", extensions: ["json"] }],
+      });
+      if (typeof path !== "string" || !path) return;
+      const json = JSON.stringify(collectBackup(), null, 2);
+      await invoke("save_data_file", {
+        path,
+        bytes: Array.from(new TextEncoder().encode(json)),
+      });
+      showToast("设置已导出", "success");
+    } catch (e) {
+      showToast(String(e), "error", 5000);
+    }
+  }
+
+  async function doImport() {
+    try {
+      const path = await open({
+        title: "导入 OmniKit 设置",
+        multiple: false,
+        directory: false,
+        filters: [{ name: "JSON 文件", extensions: ["json"] }],
+      });
+      if (typeof path !== "string" || !path) return;
+      const raw = await invoke<string>("read_text_file", { path });
+      const n = applyBackup(raw);
+      showToast(`已导入 ${n} 项配置，即将刷新界面`, "success");
+      setTimeout(() => location.reload(), 900);
+    } catch (e) {
+      showToast(String(e), "error", 5000);
+    }
   }
 
   function saveSearchRules() {
@@ -322,6 +402,16 @@ export default function Settings() {
           </div>
           <div className="kv-row">
             <span className="kv-k" style={{ minWidth: 170 }}>
+              上次检查
+            </span>
+            <span className="hint" style={{ flex: 1 }}>
+              {lastResult
+                ? `${fmtResultTime(lastResult.t)} · ${lastResult.msg}`
+                : "本机还没有检查过更新"}
+            </span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-k" style={{ minWidth: 170 }}>
               检查更新
             </span>
             <span className="hint" style={{ flex: 1 }}>
@@ -342,6 +432,34 @@ export default function Settings() {
             )}
             <button className="btn btn-sm" onClick={checkUpdate} disabled={checking}>
               {checking ? "检查中…" : "立即检查"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="field">
+        <span className="field-label">备份与迁移</span>
+        <div className="kv-list">
+          <div className="kv-row">
+            <span className="kv-k" style={{ minWidth: 170 }}>
+              导出设置
+            </span>
+            <span className="hint" style={{ flex: 1 }}>
+              把 HTTP 历史、环境变量、MCP 服务器等本地配置存成 JSON；MCP 请求头可能存有令牌，请妥善保管导出文件
+            </span>
+            <button className="btn btn-sm" onClick={doExport}>
+              导出…
+            </button>
+          </div>
+          <div className="kv-row">
+            <span className="kv-k" style={{ minWidth: 170 }}>
+              导入设置
+            </span>
+            <span className="hint" style={{ flex: 1 }}>
+              从备份文件恢复，同名配置会被覆盖，导入后自动刷新
+            </span>
+            <button className="btn btn-sm" onClick={doImport}>
+              导入…
             </button>
           </div>
         </div>

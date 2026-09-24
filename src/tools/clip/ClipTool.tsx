@@ -184,22 +184,25 @@ export default function ClipTool() {
             return (
               <div className="kv-row clip-row" key={it.id}>
                 {it.kind === "image" && it.image_base64 ? (
-                  <img
-                    className="clip-thumb clickable"
-                    src={`data:image/png;base64,${it.image_base64}`}
-                    alt="剪贴板图片"
-                    title="点击预览大图"
-                    onClick={() => setPreview(it)}
-                  />
+                  <>
+                    <img
+                      className="clip-thumb clickable"
+                      src={`data:image/png;base64,${it.image_base64}`}
+                      alt="剪贴板图片"
+                      title="点击预览大图"
+                      onClick={() => setPreview(it)}
+                    />
+                    <span className="clip-dim">
+                      图片 {it.width}×{it.height}
+                    </span>
+                  </>
                 ) : (
                   <span className="clip-text" title={it.text ?? ""}>
                     {it.text || "（空）"}
                   </span>
                 )}
                 <span className="kv-k">
-                  {it.kind === "image"
-                    ? `图片 ${it.width}×${it.height} · ${fmtBytes(it.bytes)}`
-                    : fmtBytes(new Blob([it.text ?? ""]).size)}
+                  {fmtBytes(it.kind === "image" ? it.bytes : new Blob([it.text ?? ""]).size)}
                   {" · "}
                   {fmtTime(it.time)}
                 </span>

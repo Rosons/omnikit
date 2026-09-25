@@ -253,12 +253,20 @@ export default function App() {
             title={pinned ? "取消窗口置顶" : "窗口置顶，悬浮在其他应用上面"}
             aria-pressed={pinned}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path
-                d="M14.5 2.5l7 7-2.6 1a4 4 0 0 0-2.3 2.2l-1.4 3.5a1 1 0 0 1-1.65.35L9.4 12.4 3.6 18.2a1 1 0 0 1-1.4-1.4l5.8-5.8-4.15-4.15a1 1 0 0 1 .35-1.65L7.7 3.8a4 4 0 0 0 2.2-2.3z"
-                fill="currentColor"
-                transform={pinned ? "rotate(45 12 12)" : undefined}
-              />
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill={pinned ? "currentColor" : "none"}
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+              style={pinned ? { transform: "rotate(45deg)" } : undefined}
+            >
+              <line x1="12" y1="17" x2="12" y2="22" />
+              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
             </svg>
           </button>
           <button

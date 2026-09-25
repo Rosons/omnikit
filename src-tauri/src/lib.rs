@@ -5,6 +5,7 @@ mod crypto;
 mod csvtool;
 mod error;
 mod format;
+mod hex;
 mod history;
 mod lan;
 mod mcp;
@@ -104,6 +105,8 @@ pub fn run() {
             csvtool::csv_open,
             csvtool::csv_rows,
             csvtool::csv_stats,
+            hex::hex_read,
+            hex::hex_search,
             lan::lan_probe_start,
             lan::lan_probe_stop,
             commands::log_append,

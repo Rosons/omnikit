@@ -2410,3 +2410,28 @@ details.mcp-log pre {
 }
 .csv-idx { color: var(--text-3); width: 52px; text-align: right; }
 .csv-empty { color: var(--text-3); }
+
+/* ===== 二进制查看器 ===== */
+.hex-flex-none { flex: none; }
+.hex-row { display: flex; align-items: center; gap: 10px; }
+.hex-path { flex: 1; min-width: 0; }
+.hex-pat { width: 230px; }
+.hex-jump { width: 150px; }
+.hex-view {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  background: var(--card);
+  padding: 8px 12px;
+  max-height: 460px;
+  overflow: auto;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.hex-line { display: flex; align-items: baseline; gap: 14px; white-space: pre; }
+.hex-off { color: var(--text-3); }
+.hex-cells { display: inline-flex; }
+.hex-cell { width: 22px; color: var(--text-1); }
+.hex-cell.hex-gap { margin-left: 8px; }
+.hex-ascii { color: var(--text-2); letter-spacing: 1px; }
+.hex-hit { background: var(--primary-dim, var(--fill-2)); color: var(--primary); border-radius: 3px; }

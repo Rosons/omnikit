@@ -169,6 +169,14 @@ export const tools: ToolModule[] = [
     component: lazy(() => import("./lan/LanTool")),
   },
   {
+    id: "hex",
+    group: "dev" as ToolGroup,
+    name: "二进制查看",
+    desc: "十六进制浏览与字节搜索",
+    icon: HexIcon,
+    component: lazy(() => import("./hex/HexTool")),
+  },
+  {
     id: "csv",
     group: "dev" as ToolGroup,
     name: "CSV 查看器",
@@ -522,6 +530,19 @@ function CsvIcon({ size = 16 }: { size?: number }) {
       <rect x="3" y="4" width="18" height="16" rx="2" fill="#9fcdfb" />
       <rect x="3" y="4" width="18" height="4.5" rx="2" fill="#06a7ff" />
       <path d="M3 12.8h18M3 16.4h18M9.5 8.5v11.5M15.5 8.5v11.5" stroke="#06a7ff" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
+function HexIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3" y="4" width="18" height="16" rx="2" fill="#9fcdfb" />
+      <rect x="3" y="4" width="18" height="6" rx="2" fill="#06a7ff" />
+      <g fill="#06a7ff" fontFamily="monospace" fontSize="8" fontWeight="700">
+        <text x="5.2" y="17.5">0F</text>
+        <text x="12.5" y="17.5" opacity="0.65">3A</text>
+      </g>
     </svg>
   );
 }

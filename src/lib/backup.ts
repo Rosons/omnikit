@@ -5,6 +5,14 @@
 
 const PREFIX = "omnikit.";
 
+/** 历史版本废弃的键:功能已删,本地残留,不参与导出/导入 */
+const LEGACY_KEYS = ["omnikit.update.proxy"];
+
+/** 启动时清掉废弃键的残留,让本地存储保持干净 */
+export function purgeLegacyKeys() {
+  for (const k of LEGACY_KEYS) localStorage.removeItem(k);
+}
+
 export interface BackupFile {
   app: "omnikit";
   schema: 1;
@@ -16,7 +24,7 @@ export function collectBackup(now = new Date()): BackupFile {
   const data: Record<string, string> = {};
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith(PREFIX)) {
+    if (key && key.startsWith(PREFIX) && !LEGACY_KEYS.includes(key)) {
       const v = localStorage.getItem(key);
       if (v !== null) data[key] = v;
     }

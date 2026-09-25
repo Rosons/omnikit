@@ -448,7 +448,7 @@ export default function Settings() {
               配置存为 JSON 文件；可能含 MCP 令牌，注意保管
             </span>
             <button className="btn btn-sm" onClick={doExport}>
-              导出…
+              导出
             </button>
           </div>
           <div className="kv-row">
@@ -459,7 +459,7 @@ export default function Settings() {
               从 JSON 备份恢复，覆盖同名配置
             </span>
             <button className="btn btn-sm" onClick={doImport}>
-              导入…
+              导入
             </button>
           </div>
         </div>

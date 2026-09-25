@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { applyBackup, collectBackup } from "./backup";
+import { applyBackup, collectBackup, purgeLegacyKeys } from "./backup";
 
 // node 测试环境没有 localStorage,用 Map 实现最小桩
 const store = new Map<string, string>();
@@ -32,6 +32,13 @@ describe("设置备份 collectBackup", () => {
   it("空存储导出空 data", () => {
     localStorage.clear();
     expect(collectBackup().data).toEqual({});
+  });
+
+  it("废弃键不导出且可清除", () => {
+    localStorage.setItem("omnikit.update.proxy", "http://127.0.0.1:7890");
+    expect(collectBackup().data["omnikit.update.proxy"]).toBeUndefined();
+    purgeLegacyKeys();
+    expect(localStorage.getItem("omnikit.update.proxy")).toBeNull();
   });
 });
 

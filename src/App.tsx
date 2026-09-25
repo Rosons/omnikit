@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { tools, GROUPS, type ToolGroup, type ToolModule } from "./tools/registry";
+import { purgeLegacyKeys } from "./lib/backup";
 import { ToastHost, showToast } from "./components/Toast";
 import { ConfirmHost } from "./components/ConfirmDialog";
 import Settings from "./tools/settings/Settings";
@@ -118,6 +119,7 @@ export default function App() {
   // 版本号取自应用本体,与打包配置天然一致
   useEffect(() => {
     getVersion().then(setVersion).catch(() => {});
+    purgeLegacyKeys();
   }, []);
 
   // 启动时静默检查更新(每天最多一次,可在设置里关)

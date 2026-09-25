@@ -2368,14 +2368,26 @@ details.mcp-log pre {
 .dns-domain { flex: 1; min-width: 0; }
 .dns-servers { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dns-custom { width: 180px; }
-.dns-raw summary { cursor: default; }
+.dns-raw { margin-top: 10px; }
+.dns-raw summary {
+  cursor: default;
+  color: var(--text-2);
+  font-size: 12px;
+  user-select: none;
+}
 .dns-raw-pre {
-  height: auto;
-  max-height: 220px;
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: var(--fill);
+  border-radius: var(--radius-s);
+  max-height: 200px;
   overflow: auto;
-  margin-top: 8px;
-  min-height: 0;
   white-space: pre-wrap;
+  word-break: break-all;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2);
 }
 
 /* ===== CSV 查看器 ===== */

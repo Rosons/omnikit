@@ -162,8 +162,8 @@ export default function DnsTool() {
               )}
               {r.reply && (
                 <details className="dns-raw">
-                  <summary className="hint">原始输出</summary>
-                  <pre className="textarea input-mono dns-raw-pre">{r.reply.raw}</pre>
+                  <summary>原始输出</summary>
+                  <pre className="dns-raw-pre">{r.reply.raw}</pre>
                 </details>
               )}
             </div>
@@ -171,7 +171,7 @@ export default function DnsTool() {
         </div>
       )}
 
-      {!results && (
+      {!results && !busy && (
         <div className="empty-state">
           <div className="empty-title">输入域名开始查询</div>
           <div className="hint">同一域名在多家 DNS 的结果并排对比，一眼看出劫持或未生效</div>

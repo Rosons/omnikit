@@ -210,14 +210,13 @@ fn load_from_disk(app: &AppHandle) -> Option<Vec<ClipItem>> {
     serde_json::from_slice::<ClipFile>(&json).ok().map(|f| f.items)
 }
 
-/// 启动时恢复:读到历史后回填内存,续上 id 序列
+/// 启动时恢复:读到历史后回填内存,续上 id 序列。
+/// 落盘开关只控制「写不写」,不控制「读不读」——关闭落盘后重启,
+/// 磁盘上保留的历史仍要加载显示,否则看起来像历史丢了只剩最新一条
 pub fn clip_init(app: &AppHandle) {
     let st = app.state::<ClipState>();
     st.persist
         .store(crate::settings::load(app).clip_persist, Ordering::Relaxed);
-    if !st.persist.load(Ordering::Relaxed) {
-        return;
-    }
     if cached_key(&st).is_none() {
         eprintln!("[clip] 无法获取系统凭据库密钥，本次运行不落盘");
         return;
@@ -226,7 +225,7 @@ pub fn clip_init(app: &AppHandle) {
         let mut items = st.items.lock().unwrap();
         *items = restored;
         items.truncate(MAX_ITEMS);
-        let max_id = items.first().map(|i| i.id).unwrap_or(0);
+        let max_id = items.iter().map(|i| i.id).max().unwrap_or(0);
         st.next_id.store(max_id + 1, Ordering::Relaxed);
     }
 }
@@ -437,17 +436,42 @@ pub fn clip_clear(state: tauri::State<'_, ClipState>, app: AppHandle) -> Result<
     Ok(())
 }
 
-/// 删除单条历史,开启落盘时立即同步写盘
+/// 把指定列表加密写入磁盘文件(不经过内存状态,供落盘关闭期间的显式删除同步用)
+fn write_items(app: &AppHandle, items: Vec<ClipItem>) -> Result<(), String> {
+    let st = app.state::<ClipState>();
+    let Some(key) = cached_key(&st) else {
+        return Err("无法获取系统凭据库密钥".into());
+    };
+    let Some(path) = clip_file(app) else {
+        return Err("无法定位历史文件".into());
+    };
+    let json =
+        serde_json::to_vec(&ClipFile { items }).map_err(|e| format!("序列化失败：{e}"))?;
+    let blob = encrypt(&key, &json)?;
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let tmp = path.with_extension("bin.tmp");
+    std::fs::write(&tmp, &blob).map_err(|e| format!("写入失败：{e}"))?;
+    std::fs::rename(&tmp, &path).map_err(|e| format!("替换失败：{e}"))
+}
+
+/// 删除单条历史。明确的删除同步从磁盘文件移除,与落盘开关无关——
+/// 否则落盘关闭期间删掉的内容,重新开启落盘合并时会从磁盘"复活"
 #[tauri::command]
 pub fn clip_remove(state: tauri::State<'_, ClipState>, app: AppHandle, id: u64) -> Result<(), String> {
     {
         let mut items = state.items.lock().unwrap();
         items.retain(|i| i.id != id);
     }
+    state.dirty.store(true, Ordering::Relaxed);
     if state.persist.load(Ordering::Relaxed) {
         save_now(&app);
-    } else {
-        state.dirty.store(false, Ordering::Relaxed);
+    } else if let Some(disk) = load_from_disk(&app) {
+        if disk.iter().any(|i| i.id == id) {
+            let remain: Vec<ClipItem> = disk.into_iter().filter(|i| i.id != id).collect();
+            write_items(&app, remain)?;
+        }
     }
     Ok(())
 }

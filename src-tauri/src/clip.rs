@@ -241,9 +241,24 @@ pub fn clip_force_save(app: &AppHandle) {
     save_now(app);
 }
 
+/// 内容级去重:同类型且内容完全一致视为同一条。
+/// 启动恢复历史后监听线程首轮会把关闭前留在系统剪贴板的内容再记一次,靠这里挡住。
+fn same_content(a: &ClipItem, b: &ClipItem) -> bool {
+    if a.kind != b.kind {
+        return false;
+    }
+    match a.kind.as_str() {
+        "text" => a.text == b.text,
+        _ => a.width == b.width && a.height == b.height && a.image_base64 == b.image_base64,
+    }
+}
+
 fn record(app: &AppHandle, item: ClipItem) {
     let st = app.state::<ClipState>();
     let mut items = st.items.lock().unwrap();
+    if items.first().is_some_and(|first| same_content(first, &item)) {
+        return;
+    }
     items.insert(0, item);
     items.truncate(MAX_ITEMS);
     drop(items);
@@ -484,5 +499,58 @@ mod tests {
     fn 过短密文直接报错() {
         assert!(decrypt(&test_key(), &[0u8; 12]).is_err());
         assert!(decrypt(&test_key(), &[0u8; 5]).is_err());
+    }
+}
+
+#[cfg(test)]
+mod dedupe_tests {
+    use super::{same_content, ClipItem};
+
+    fn text_item(s: &str) -> ClipItem {
+        ClipItem {
+            id: 1,
+            kind: "text".into(),
+            text: Some(s.into()),
+            image_base64: None,
+            width: None,
+            height: None,
+            bytes: 0,
+            time: 0,
+        }
+    }
+
+    fn img_item(w: usize, h: usize, b64: &str) -> ClipItem {
+        ClipItem {
+            id: 2,
+            kind: "image".into(),
+            text: None,
+            image_base64: Some(b64.into()),
+            width: Some(w),
+            height: Some(h),
+            bytes: 0,
+            time: 0,
+        }
+    }
+
+    #[test]
+    fn 相同文本判定重复() {
+        assert!(same_content(&text_item("hello"), &text_item("hello")));
+    }
+
+    #[test]
+    fn 不同文本不算重复() {
+        assert!(!same_content(&text_item("hello"), &text_item("world")));
+    }
+
+    #[test]
+    fn 类型不同不算重复() {
+        assert!(!same_content(&text_item("hello"), &img_item(2, 2, "AAA")));
+    }
+
+    #[test]
+    fn 图片按尺寸与编码比对() {
+        assert!(same_content(&img_item(8, 8, "AAA"), &img_item(8, 8, "AAA")));
+        assert!(!same_content(&img_item(8, 8, "AAA"), &img_item(8, 16, "AAA")));
+        assert!(!same_content(&img_item(8, 8, "AAA"), &img_item(8, 8, "BBB")));
     }
 }

@@ -31,6 +31,10 @@ pub struct ClipItem {
     pub height: Option<usize>,
     pub bytes: u64,
     pub time: u64,
+    /// 内容指纹:文本为 fnv(UTF-8 字节),图片为 fnv(宽+高+RGBA)。
+    /// 旧版落盘文件无此字段,反序列化为 0,比对时退回逐字段比较
+    #[serde(default)]
+    pub hash: u64,
 }
 
 #[derive(Default)]
@@ -38,7 +42,10 @@ pub struct ClipState {
     pub items: Mutex<Vec<ClipItem>>,
     pub next_id: AtomicU64,
     pub paused: AtomicBool,
-    pub last_hash: Mutex<u64>,
+    /// 最近一次见到的文本/图片指纹。分开记:两者共用一个时,
+    /// 文本+图片混合格式(如 Office 复制)会让两条路径交替误判、每秒重复记录
+    pub last_text: Mutex<u64>,
+    pub last_img: Mutex<u64>,
     /// 是否加密落盘(来自设置,默认开)
     pub persist: AtomicBool,
     /// 有未写盘的新记录
@@ -241,8 +248,7 @@ pub fn clip_force_save(app: &AppHandle) {
     save_now(app);
 }
 
-/// 内容级去重:同类型且内容完全一致视为同一条。
-/// 启动恢复历史后监听线程首轮会把关闭前留在系统剪贴板的内容再记一次,靠这里挡住。
+/// 同类型且内容完全一致。图片 PNG 编码是确定性的,同图同字节,可直接比 base64
 fn same_content(a: &ClipItem, b: &ClipItem) -> bool {
     if a.kind != b.kind {
         return false;
@@ -253,16 +259,43 @@ fn same_content(a: &ClipItem, b: &ClipItem) -> bool {
     }
 }
 
-fn record(app: &AppHandle, item: ClipItem) {
-    let st = app.state::<ClipState>();
-    let mut items = st.items.lock().unwrap();
-    if items.first().is_some_and(|first| same_content(first, &item)) {
-        return;
+/// 内容级去重比对。新记录都带 hash;hash 为 0 的旧数据(升级前的落盘文件)
+/// 退回逐字段比较
+fn known(a: &ClipItem, b: &ClipItem) -> bool {
+    a.kind == b.kind
+        && if a.hash != 0 && b.hash != 0 {
+            a.hash == b.hash
+        } else {
+            same_content(a, b)
+        }
+}
+
+/// 去重语义:内容已存在历史时不再插入新条——
+/// 已在顶部则原样保留(启动恢复后监听首轮同步的场景,不动顺序不刷时间);
+/// 在中间则提到顶部并刷新时间(用户重新复制了旧内容);全新内容才插入。
+/// 返回是否发生了变更(调用方据此决定要不要标脏写盘)
+fn upsert_vec(items: &mut Vec<ClipItem>, item: ClipItem) -> bool {
+    if let Some(pos) = items.iter().position(|x| known(x, &item)) {
+        if pos == 0 {
+            return false;
+        }
+        let mut found = items.remove(pos);
+        found.time = item.time;
+        items.insert(0, found);
+        return true;
     }
     items.insert(0, item);
     items.truncate(MAX_ITEMS);
-    drop(items);
-    st.dirty.store(true, Ordering::Relaxed);
+    true
+}
+
+fn upsert(app: &AppHandle, item: ClipItem) {
+    let st = app.state::<ClipState>();
+    let mut items = st.items.lock().unwrap();
+    if upsert_vec(&mut items, item) {
+        drop(items);
+        st.dirty.store(true, Ordering::Relaxed);
+    }
 }
 
 pub fn clip_monitor(app: AppHandle) {
@@ -277,16 +310,16 @@ pub fn clip_monitor(app: AppHandle) {
             continue;
         }
         maybe_save(&app);
-        // 文本
+        // 文本(有文本时本轮不看图片:截图类内容没有文本,Office 混合格式以文本为准)
         if let Ok(text) = cb.get_text() {
             if !text.is_empty() && text.len() <= MAX_TEXT {
                 let h = fnv(text.as_bytes());
                 let st = app.state::<ClipState>();
-let mut last = st.last_hash.lock().unwrap();
+                let mut last = st.last_text.lock().unwrap();
                 if h != *last {
                     *last = h;
                     drop(last);
-                    record(
+                    upsert(
                         &app,
                         ClipItem {
                             id: app.state::<ClipState>().next_id.fetch_add(1, Ordering::Relaxed),
@@ -297,10 +330,11 @@ let mut last = st.last_hash.lock().unwrap();
                             height: None,
                             bytes: 0,
                             time: now(),
+                            hash: h,
                         },
                     );
-                    continue;
                 }
+                continue;
             }
         }
         // 图片(RGBA → PNG)
@@ -315,7 +349,7 @@ let mut last = st.last_hash.lock().unwrap();
             hash_bytes.extend_from_slice(&bytes);
             let h = fnv(&hash_bytes);
             let st = app.state::<ClipState>();
-let mut last = st.last_hash.lock().unwrap();
+let mut last = st.last_img.lock().unwrap();
             if h == *last {
                 continue;
             }
@@ -324,7 +358,7 @@ let mut last = st.last_hash.lock().unwrap();
             if let Ok(png_bytes) = encode_png(&bytes, width, height) {
                 let b64 = use_base64(&png_bytes);
                 let size = png_bytes.len() as u64;
-                record(
+                upsert(
                     &app,
                     ClipItem {
                         id: app.state::<ClipState>().next_id.fetch_add(1, Ordering::Relaxed),
@@ -335,6 +369,7 @@ let mut last = st.last_hash.lock().unwrap();
                         height: Some(height),
                         bytes: size,
                         time: now(),
+                        hash: h,
                     },
                 );
             }
@@ -365,12 +400,9 @@ pub fn clip_write(state: tauri::State<'_, ClipState>, id: u64) -> Result<(), Str
     let mut cb = Clipboard::new().map_err(|e| format!("无法访问剪贴板：{e}"))?;
     if item.kind == "text" {
         let text = item.text.clone().unwrap_or_default();
+        // 主动更新文本指纹,避免监听线程把自己的回贴再记一条
+        *state.last_text.lock().unwrap() = fnv(text.as_bytes());
         cb.set_text(text).map_err(|e| format!("写入失败：{e}"))?;
-        let h = 0; // 回贴内容下次轮询会因 last_hash 更新而被跳过
-        let _ = h;
-        // 主动更新 last_hash,避免监听线程把自己的回贴再记一条
-        let text2 = item.text.clone().unwrap_or_default();
-        *state.last_hash.lock().unwrap() = fnv(text2.as_bytes());
     } else {
         let b64 = item.image_base64.clone().unwrap_or_default();
         let png_bytes = {
@@ -389,7 +421,7 @@ pub fn clip_write(state: tauri::State<'_, ClipState>, id: u64) -> Result<(), Str
         hb.extend_from_slice(&(w as u64).to_le_bytes());
         hb.extend_from_slice(&(h as u64).to_le_bytes());
         hb.extend_from_slice(&rgba);
-        *state.last_hash.lock().unwrap() = fnv(&hb);
+        *state.last_img.lock().unwrap() = fnv(&hb);
     }
     Ok(())
 }
@@ -504,7 +536,7 @@ mod tests {
 
 #[cfg(test)]
 mod dedupe_tests {
-    use super::{same_content, ClipItem};
+    use super::{same_content, upsert_vec, ClipItem};
 
     fn text_item(s: &str) -> ClipItem {
         ClipItem {
@@ -516,6 +548,7 @@ mod dedupe_tests {
             height: None,
             bytes: 0,
             time: 0,
+            hash: 0,
         }
     }
 
@@ -529,6 +562,7 @@ mod dedupe_tests {
             height: Some(h),
             bytes: 0,
             time: 0,
+            hash: 0,
         }
     }
 
@@ -552,5 +586,66 @@ mod dedupe_tests {
         assert!(same_content(&img_item(8, 8, "AAA"), &img_item(8, 8, "AAA")));
         assert!(!same_content(&img_item(8, 8, "AAA"), &img_item(8, 16, "AAA")));
         assert!(!same_content(&img_item(8, 8, "AAA"), &img_item(8, 8, "BBB")));
+    }
+
+    #[test]
+    fn upsert_全新内容插入() {
+        let mut items = vec![text_item("a")];
+        assert!(upsert_vec(&mut items, text_item("b")));
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].text.as_deref(), Some("b"));
+    }
+
+    #[test]
+    fn upsert_已在顶部则原样保留不刷时间() {
+        let mut first = text_item("a");
+        first.time = 100;
+        let mut second = text_item("b");
+        second.time = 90;
+        let mut items = vec![first, second];
+        let mut again = text_item("a");
+        again.time = 200;
+        assert!(!upsert_vec(&mut items, again));
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].time, 100);
+    }
+
+    #[test]
+    fn upsert_重新复制旧内容提到顶部并刷新时间() {
+        let mut top = text_item("b");
+        top.time = 90;
+        let mut old = text_item("a");
+        old.time = 10;
+        old.id = 7;
+        let mut items = vec![top, old];
+        let mut recopy = text_item("a");
+        recopy.time = 200;
+        assert!(upsert_vec(&mut items, recopy));
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].id, 7);
+        assert_eq!(items[0].time, 200);
+    }
+
+    #[test]
+    fn upsert_新hash命中旧数据按内容比对() {
+        // 旧落盘文件里的条目 hash 为 0,新记录带 hash,应按字段内容命中且不重复插入
+        let old = text_item("legacy");
+        let mut items = vec![old];
+        let mut fresh = text_item("legacy");
+        fresh.hash = 12345;
+        assert!(!upsert_vec(&mut items, fresh));
+        assert_eq!(items.len(), 1);
+    }
+
+    #[test]
+    fn upsert_双方都有hash时按指纹比对() {
+        let mut a = text_item("a");
+        a.hash = 111;
+        let mut items = vec![a];
+        let mut b = text_item("a");
+        b.hash = 111;
+        b.time = 200;
+        assert!(!upsert_vec(&mut items, b));
+        assert_eq!(items.len(), 1);
     }
 }

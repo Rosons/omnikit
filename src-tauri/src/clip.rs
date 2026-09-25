@@ -452,8 +452,20 @@ pub fn clip_remove(state: tauri::State<'_, ClipState>, app: AppHandle, id: u64) 
     Ok(())
 }
 
-/// 切换加密落盘:关闭只停写、文件保留(删除靠清空);开启时立即写一次盘,
-/// 内存为空但磁盘有历史(重启前关过落盘)则先恢复回来,避免覆盖旧数据
+/// 开启落盘时的历史合并:磁盘历史为基底,内存记录(落盘关闭期间新复制的)
+/// 按内容去重逐条并入,最新复制的排最前。绝不用内存直接覆盖磁盘——
+/// 重启后内存只剩监听到的一条,覆盖会把整份历史冲掉
+fn merge_history(disk: Vec<ClipItem>, memory: &[ClipItem]) -> Vec<ClipItem> {
+    let mut merged = disk;
+    for it in memory.iter().rev() {
+        upsert_vec(&mut merged, it.clone());
+    }
+    merged.truncate(MAX_ITEMS);
+    merged
+}
+
+/// 切换加密落盘:关闭只停写、文件保留(删除靠清空);
+/// 开启时磁盘与内存合并后再写盘,历史永不丢失
 #[tauri::command]
 pub fn clip_set_persist(state: tauri::State<'_, ClipState>, app: AppHandle, persist: bool) -> Result<(), String> {
     state.persist.store(persist, Ordering::Relaxed);
@@ -466,15 +478,13 @@ pub fn clip_set_persist(state: tauri::State<'_, ClipState>, app: AppHandle, pers
         *st.0.lock().unwrap() = s;
     }
     if persist {
-        if state.items.lock().unwrap().is_empty() {
-            if let Some(restored) = load_from_disk(&app) {
-                let mut items = state.items.lock().unwrap();
-                *items = restored;
-                items.truncate(MAX_ITEMS);
-                let max_id = items.first().map(|i| i.id).unwrap_or(0);
-                state.next_id.store(max_id + 1, Ordering::Relaxed);
-            }
-        }
+        let restored = load_from_disk(&app).unwrap_or_default();
+        let max_id = {
+            let mut items = state.items.lock().unwrap();
+            *items = merge_history(restored, &items);
+            items.iter().map(|i| i.id).max().unwrap_or(0)
+        };
+        state.next_id.store(max_id + 1, Ordering::Relaxed);
         save_now(&app);
     }
     Ok(())
@@ -647,5 +657,47 @@ mod dedupe_tests {
         b.time = 200;
         assert!(!upsert_vec(&mut items, b));
         assert_eq!(items.len(), 1);
+    }
+
+    /// 便捷构造:id 可指定,便于断言顺序
+    fn t(id: u64, s: &str) -> ClipItem {
+        let mut it = text_item(s);
+        it.id = id;
+        it
+    }
+
+    #[test]
+    fn merge_重启后开启_内存单条并入磁盘历史顶部() {
+        let disk = vec![t(3, "a"), t(2, "b"), t(1, "c")];
+        let memory = vec![t(9, "x")];
+        let merged = super::merge_history(disk, &memory);
+        let texts: Vec<_> = merged.iter().map(|i| i.text.as_deref().unwrap()).collect();
+        assert_eq!(texts, ["x", "a", "b", "c"]);
+    }
+
+    #[test]
+    fn merge_内存单条与磁盘最新相同则原样保留() {
+        let disk = vec![t(3, "a"), t(2, "b"), t(1, "c")];
+        let memory = vec![t(9, "a")];
+        let merged = super::merge_history(disk, &memory);
+        assert_eq!(merged.len(), 3);
+        assert_eq!(merged[0].text.as_deref(), Some("a"));
+    }
+
+    #[test]
+    fn merge_内存为空磁盘原样() {
+        let disk = vec![t(3, "a"), t(2, "b")];
+        let merged = super::merge_history(disk, &[]);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn merge_关闭期间复制多条按最新在前并入() {
+        let disk = vec![t(3, "a"), t(2, "b")];
+        // 内存是新到旧:最新 y 在前
+        let memory = vec![t(11, "y"), t(10, "x")];
+        let merged = super::merge_history(disk, &memory);
+        let texts: Vec<_> = merged.iter().map(|i| i.text.as_deref().unwrap()).collect();
+        assert_eq!(texts, ["y", "x", "a", "b"]);
     }
 }

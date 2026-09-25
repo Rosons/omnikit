@@ -2324,3 +2324,40 @@ details.mcp-log pre {
 .lan-guess { color: var(--text-2); flex: none; }
 .lan-guess.lan-guess-dev { color: var(--primary); }
 .lan-guess.lan-guess-svc { color: var(--success); }
+
+/* ===== 批量重命名 ===== */
+.rename-flex-none { flex: none; }
+.rename-row { display: flex; align-items: center; gap: 10px; }
+.rename-dir { flex: 1; min-width: 0; }
+.rename-rules { display: flex; flex-direction: column; gap: 8px; }
+.rename-rule { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rename-check { display: inline-flex; align-items: center; gap: 5px; cursor: default; }
+.rename-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  overflow: hidden;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.rename-head,
+.rename-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+.rename-head {
+  background: var(--fill-2);
+  color: var(--text-2);
+  position: sticky;
+  top: 0;
+}
+.rename-item { border-top: 1px solid var(--border); }
+.rename-from,
+.rename-to { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rename-to { font-family: Consolas, "Cascadia Mono", monospace; }
+.rename-to.rename-changed { color: var(--primary); }
+.rename-to.rename-bad { color: var(--danger); }
+.rename-to em { font-style: normal; font-size: 11.5px; }
+.rename-size { width: 70px; text-align: right; flex: none; }

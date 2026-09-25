@@ -1284,6 +1284,87 @@ pub fn disk_trash(path: String) -> Result<(), String> {
     trash::delete(&path).map_err(|e| format!("移入回收站失败：{e}"))
 }
 
+/* ---------- 批量重命名 ---------- */
+
+#[derive(Serialize)]
+pub struct RenameFile {
+    pub name: String,
+    pub mtime_secs: u64,
+    pub size: u64,
+}
+
+/// 列出目录下的普通文件(不含子目录),供重命名预览
+#[tauri::command]
+pub fn rename_list_dir(dir: String) -> Result<Vec<RenameFile>, String> {
+    let mut out = Vec::new();
+    for entry in fs::read_dir(&dir).map_err(|e| format!("无法读取目录：{e}"))? {
+        let entry = entry.map_err(|e| format!("无法读取目录：{e}"))?;
+        let ft = match entry.file_type() {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        if ft.is_dir() || ft.is_symlink() {
+            continue;
+        }
+        let md = match entry.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let mtime_secs = md
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        out.push(RenameFile {
+            name: entry.file_name().to_string_lossy().to_string(),
+            mtime_secs,
+            size: md.len(),
+        });
+    }
+    Ok(out)
+}
+
+#[derive(Serialize)]
+pub struct RenameResultItem {
+    pub from: String,
+    pub ok: bool,
+    pub err: String,
+}
+
+/// 执行重命名:前端把预览通过的 from→to 全量传回,后端再校验一遍
+/// (源存在、目标不存在、目录内不越界),单项失败不影响其余
+#[tauri::command]
+pub fn rename_apply(
+    dir: String,
+    plans: Vec<(String, String)>,
+) -> Result<Vec<RenameResultItem>, String> {
+    let base = fs::canonicalize(&dir).map_err(|e| format!("目录不存在：{e}"))?;
+    let mut results = Vec::new();
+    for (from, to) in &plans {
+        let fail = |e: String| RenameResultItem { from: from.clone(), ok: false, err: e };
+        if from == to {
+            results.push(fail("新旧名字相同，无需重命名".into()));
+            continue;
+        }
+        let src = base.join(from);
+        let dst = base.join(to);
+        if !src.is_file() {
+            results.push(fail("源文件不存在".into()));
+            continue;
+        }
+        if dst.exists() {
+            results.push(fail("目标名字已存在".into()));
+            continue;
+        }
+        match fs::rename(&src, &dst) {
+            Ok(_) => results.push(RenameResultItem { from: from.clone(), ok: true, err: String::new() }),
+            Err(e) => results.push(fail(format!("{e}"))),
+        }
+    }
+    Ok(results)
+}
+
 /* ---------- 系统监控 ---------- */
 
 #[derive(Serialize)]

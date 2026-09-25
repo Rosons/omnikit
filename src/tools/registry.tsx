@@ -145,6 +145,14 @@ export const tools: ToolModule[] = [
     component: lazy(() => import("./disk/DiskTool")),
   },
   {
+    id: "rename",
+    group: "file" as ToolGroup,
+    name: "批量重命名",
+    desc: "规则批量改名，预览确认后执行",
+    icon: RenameIcon,
+    component: lazy(() => import("./rename/RenameTool")),
+  },
+  {
     id: "fsearch",
     group: "file" as ToolGroup,
     name: "文件搜索",
@@ -461,6 +469,21 @@ function LanIcon({ size = 16 }: { size?: number }) {
         <path d="M5.6 18.4a9 9 0 0 1 0-12.8" />
         <path d="M18.4 5.6a9 9 0 0 1 0 12.8" />
       </g>
+    </svg>
+  );
+}
+
+function RenameIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3" y="5" width="12" height="14" rx="2" fill="#9fcdfb" />
+      <path d="M15 9.5h5.5a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H15z" fill="#06a7ff" />
+      <g stroke="#ffffff" strokeWidth="1.7" strokeLinecap="round">
+        <path d="M6.5 9.5h5" />
+        <path d="M6.5 12.5h5" />
+        <path d="M6.5 15.5h3.5" />
+      </g>
+      <path d="M13 6l4.5 12" stroke="#06a7ff" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }

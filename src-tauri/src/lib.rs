@@ -82,6 +82,8 @@ pub fn run() {
             commands::disk_find_dupes,
             commands::disk_dir_sizes,
             commands::disk_trash,
+            commands::rename_list_dir,
+            commands::rename_apply,
             commands::sys_overview,
             commands::proc_list,
             commands::log_tail_start,

@@ -76,7 +76,7 @@ export default function DnsTool() {
         <span className="field-label">查询</span>
         <div className="dns-row">
           <input
-            className="input input-mono dns-domain"
+            className="input input-sm input-mono dns-domain"
             value={domain}
             onChange={(e) => setDomain(e.target.value)}
             placeholder="域名，如 example.com"
@@ -91,7 +91,7 @@ export default function DnsTool() {
             onChange={setQtype}
             options={TYPES.map((t) => ({ value: t, label: t }))}
           />
-          <button className="btn btn-primary" onClick={query} disabled={busy}>
+          <button className="btn btn-sm btn-primary" onClick={query} disabled={busy}>
             {busy ? "查询中…" : "查询"}
           </button>
         </div>

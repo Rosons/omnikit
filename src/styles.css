@@ -2435,3 +2435,34 @@ details.mcp-log pre {
 .hex-cell.hex-gap { margin-left: 8px; }
 .hex-ascii { color: var(--text-2); letter-spacing: 1px; }
 .hex-hit { background: var(--primary-dim, var(--fill-2)); color: var(--primary); border-radius: 3px; }
+
+/* ===== 自绘勾选框:原生控件自带内边距,与文字中线错位 ===== */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  flex: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--card);
+  position: relative;
+  cursor: default;
+  transition: background var(--fast), border-color var(--fast);
+}
+input[type="checkbox"]:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 3.5px;
+  height: 7.5px;
+  border: solid #fff;
+  border-width: 0 1.6px 1.6px 0;
+  transform: rotate(45deg);
+}

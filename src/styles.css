@@ -2490,10 +2490,10 @@ input[type="checkbox"]:checked::after {
   white-space: nowrap;
 }
 .csv-stat { margin-left: auto; display: inline-flex; gap: 18px; color: var(--text-2); }
-.csv-stat em { font-style: normal; display: inline-flex; align-items: baseline; gap: 5px; }
+.csv-stat em { font-style: normal; display: inline-flex; align-items: baseline; gap: 4px; }
 .csv-stat i {
   font-style: normal;
   font-family: Consolas, "Cascadia Mono", monospace;
-  min-width: 56px;
-  text-align: right;
+  min-width: 44px;
+  text-align: left;
 }

@@ -538,8 +538,8 @@ function CommandPalette({
     const filtered = s
       ? list.filter((e) => (e.name + e.desc + e.id).toLowerCase().includes(s))
       : list;
-    // 无关键字时:常用工具置顶,工具在前动作在后
-    return filtered
+    // 无关键字时:常用工具置顶,工具在前动作在后;空搜索全量展示供浏览,搜索时限 10 条
+    const sorted = filtered
       .sort((a, b) => {
         if (!s) {
           const fa = a.kind === "tool" && favs.includes(a.id) ? 1 : 0;
@@ -548,8 +548,8 @@ function CommandPalette({
           if (a.kind !== b.kind) return a.kind === "tool" ? -1 : 1;
         }
         return 0;
-      })
-      .slice(0, 10);
+      });
+    return s ? sorted.slice(0, 10) : sorted;
   }, [q, favs, actions, onPick]);
 
   useEffect(() => {

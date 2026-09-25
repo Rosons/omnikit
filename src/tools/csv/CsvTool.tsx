@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { showToast } from "../../components/Toast";
+import Dropdown from "../../components/Dropdown";
 import { fmtBytes } from "../../lib/format";
 
 interface CsvMeta {
@@ -33,6 +34,7 @@ export default function CsvTool() {
   const [filterText, setFilterText] = useState("");
   const [matchedTotal, setMatchedTotal] = useState<number | null>(null);
   const [stats, setStats] = useState<ColStat[] | null>(null);
+  const statsRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<number | null>(null);
 
@@ -95,6 +97,8 @@ export default function CsvTool() {
   async function loadStats() {
     try {
       setStats(await invoke<ColStat[]>("csv_stats", { path }));
+      // 统计块在表格下方,加载完自动滚过去,别让用户找
+      setTimeout(() => statsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
     } catch (e) {
       showToast(String(e), "error", 5000);
     }
@@ -132,22 +136,21 @@ export default function CsvTool() {
       {meta && (
         <>
           <div className="tool-actions csv-flex-none">
-            <select
-              className="input input-sm"
-              style={{ width: 130 }}
-              value={filterCol}
-              onChange={(e) => {
-                setFilterCol(Number(e.target.value));
+            <Dropdown
+              width={130}
+              value={String(filterCol)}
+              onChange={(v) => {
+                setFilterCol(Number(v));
                 setPage(0);
               }}
-            >
-              <option value={-1}>全部列</option>
-              {meta.headers.map((h, i) => (
-                <option key={i} value={i}>
-                  {h || `第 ${i + 1} 列`}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "-1", label: "全部列" },
+                ...meta.headers.map((h, i) => ({
+                  value: String(i),
+                  label: h || `第 ${i + 1} 列`,
+                })),
+              ]}
+            />
             <input
               className="input input-sm csv-filter"
               value={filterText}
@@ -155,11 +158,11 @@ export default function CsvTool() {
                 setFilterText(e.target.value);
                 setPage(0);
               }}
-              placeholder="筛选当前视图，输入即查"
+              placeholder={filterCol >= 0 ? `在「${meta.headers[filterCol] || `第 ${filterCol + 1} 列`}」中筛选` : "全表筛选，输入即查"}
               spellCheck={false}
             />
-            <button className="btn btn-sm" onClick={loadStats}>
-              列概况
+            <button className="btn btn-sm" onClick={stats ? () => setStats(null) : loadStats}>
+              {stats ? "收起概况" : "列概况"}
             </button>
             {loading && <span className="hint">读取中…</span>}
           </div>
@@ -226,16 +229,17 @@ export default function CsvTool() {
           </div>
 
           {stats && (
-            <div className="field csv-flex-none">
+            <div className="field csv-flex-none" ref={statsRef}>
               <span className="field-label">列概况</span>
               <div className="kv-list">
                 {stats.map((s, i) => (
                   <div className="kv-row" key={i}>
-                    <span className="kv-k kv-mono" style={{ minWidth: 140 }}>
+                    <span className="kv-k kv-mono csv-stat-name" title={s.name}>
                       {s.name}
                     </span>
-                    <span className="hint" style={{ flex: 1 }}>
-                      非空 {s.non_empty} · 去重 {s.distinct}
+                    <span className="csv-stat">
+                      <em>非空<i>{s.non_empty}</i></em>
+                      <em>去重<i>{s.distinct}</i></em>
                     </span>
                   </div>
                 ))}

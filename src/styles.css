@@ -2480,3 +2480,20 @@ input[type="checkbox"]:checked::after {
   border-width: 0 1.6px 1.6px 0;
   transform: rotate(45deg);
 }
+
+/* CSV 列概况:统计数值统一靠右、定宽右对齐,列名长短不影响纵向对齐 */
+.csv-stat-name {
+  min-width: 150px;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.csv-stat { margin-left: auto; display: inline-flex; gap: 18px; color: var(--text-2); }
+.csv-stat em { font-style: normal; display: inline-flex; align-items: baseline; gap: 5px; }
+.csv-stat i {
+  font-style: normal;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  min-width: 56px;
+  text-align: right;
+}

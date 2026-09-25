@@ -40,9 +40,9 @@ export default function LanTool() {
     const unProg = listen<[number, number]>("lan://progress", (e) => {
       setProgress(e.payload);
     });
-    const unDone = listen<number>("lan://done", (n) => {
+    const unDone = listen<number>("lan://done", (e) => {
       setScanning(false);
-      setEnded(`扫描完成，共发现 ${n} 台设备（${fmtTime(Date.now())}）`);
+      setEnded(`扫描完成，共发现 ${e.payload} 台设备（${fmtTime(Math.floor(Date.now() / 1000))}）`);
     });
     return () => {
       unDev.then((fn) => fn());

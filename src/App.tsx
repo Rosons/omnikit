@@ -5,6 +5,15 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { tools, GROUPS, type ToolGroup, type ToolModule } from "./tools/registry";
 import { purgeLegacyKeys } from "./lib/backup";
+import { saveThemeMode, applyTheme, type ThemeMode } from "./lib/theme";
+
+/** 命令面板里的动作:非工具页的即时操作,集中注册,新动作在此数组加一行 */
+interface PaletteAction {
+  id: string;
+  name: string;
+  desc: string;
+  run: () => void;
+}
 import { ToastHost, showToast } from "./components/Toast";
 import { ConfirmHost } from "./components/ConfirmDialog";
 import Settings from "./tools/settings/Settings";
@@ -153,6 +162,71 @@ export default function App() {
     setShowSettings(false);
     setPaletteOpen(false);
   }
+
+  // 命令面板的动作集:设置入口 + 即时操作。新增动作在此加一行即可
+  const paletteActions: PaletteAction[] = [
+    {
+      id: "act-settings",
+      name: "设置",
+      desc: "应用偏好设置",
+      run: () => {
+        setShowSettings(true);
+        setPaletteOpen(false);
+      },
+    },
+    {
+      id: "act-theme",
+      name: "切换深浅色主题",
+      desc: "在浅色与深色之间切换",
+      run: () => {
+        const next: ThemeMode =
+          document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+        saveThemeMode(next);
+        applyTheme(next);
+        showToast(`已切换到${next === "dark" ? "深色" : "浅色"}主题`, "success", 2000);
+      },
+    },
+    {
+      id: "act-clip-pause",
+      name: "暂停/恢复剪贴板监听",
+      desc: "临时停止或继续记录剪贴板历史",
+      run: () => {
+        invoke<boolean>("clip_toggle_pause")
+          .then((paused) =>
+            showToast(paused ? "已暂停剪贴板监听" : "已恢复剪贴板监听", "success", 2000),
+          )
+          .catch((e) => showToast(String(e), "error"));
+      },
+    },
+    {
+      id: "act-log",
+      name: "打开日志文件夹",
+      desc: "查看运行与错误日志",
+      run: () => invoke("open_log_dir").catch((e) => showToast(String(e), "error")),
+    },
+    {
+      id: "act-hide",
+      name: "隐藏窗口",
+      desc: "收到系统托盘继续后台运行",
+      run: () => getCurrentWindow().hide().catch(() => {}),
+    },
+    {
+      id: "act-check-update",
+      name: "检查更新",
+      desc: "查询 GitHub 上的最新发布版本",
+      run: () => {
+        invoke<{ current: string; version: string } | null>("updater_check")
+          .then((avail) =>
+            showToast(
+              avail ? `发现新版本 v${avail.version}，到设置页下载安装` : "已是最新版本",
+              avail ? "info" : "success",
+              4000,
+            ),
+          )
+          .catch((e) => showToast(String(e), "error", 4000));
+      },
+    },
+  ];
 
   function toggleFav(id: string) {
     setFavs((prev) => {
@@ -417,6 +491,7 @@ export default function App() {
         onPick={openTool}
         favs={favs}
         onToggleFav={toggleFav}
+        actions={paletteActions}
       />
       <ToastHost />
       <ConfirmHost />
@@ -431,12 +506,14 @@ function CommandPalette({
   onPick,
   favs,
   onToggleFav,
+  actions,
 }: {
   open: boolean;
   onClose: () => void;
   onPick: (id: string) => void;
   favs: string[];
   onToggleFav: (id: string) => void;
+  actions: PaletteAction[];
 }) {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
@@ -450,15 +527,30 @@ function CommandPalette({
     }
   }, [open]);
 
-  const list = useMemo(() => {
+  // 统一条目:全部工具 + 设置与动作,搜索时一起混入
+  const entries = useMemo(() => {
+    const list: { kind: "tool" | "action"; id: string; name: string; desc: string; run: () => void; action?: PaletteAction }[] =
+      tools.map((t) => ({ kind: "tool", id: t.id, name: t.name, desc: t.desc, run: () => onPick(t.id) }));
+    for (const a of actions) {
+      list.push({ kind: "action", id: a.id, name: a.name, desc: a.desc, run: a.run, action: a });
+    }
     const s = q.trim().toLowerCase();
-    const base = s
-      ? tools.filter((t) => (t.name + t.desc + t.id).toLowerCase().includes(s))
-      : [...tools].sort(
-          (a, b) => Number(favs.includes(b.id)) - Number(favs.includes(a.id)),
-        );
-    return base.slice(0, 10);
-  }, [q, favs]);
+    const filtered = s
+      ? list.filter((e) => (e.name + e.desc + e.id).toLowerCase().includes(s))
+      : list;
+    // 无关键字时:常用工具置顶,工具在前动作在后
+    return filtered
+      .sort((a, b) => {
+        if (!s) {
+          const fa = a.kind === "tool" && favs.includes(a.id) ? 1 : 0;
+          const fb = b.kind === "tool" && favs.includes(b.id) ? 1 : 0;
+          if (fa !== fb) return fb - fa;
+          if (a.kind !== b.kind) return a.kind === "tool" ? -1 : 1;
+        }
+        return 0;
+      })
+      .slice(0, 10);
+  }, [q, favs, actions, onPick]);
 
   useEffect(() => {
     setSel(0);
@@ -474,53 +566,72 @@ function CommandPalette({
           className="input palette-input"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="输入名称快速打开工具"
+          placeholder="搜索工具、设置与动作"
           spellCheck={false}
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") {
               e.preventDefault();
-              setSel((s) => Math.min(s + 1, list.length - 1));
+              setSel((s) => Math.min(s + 1, entries.length - 1));
             } else if (e.key === "ArrowUp") {
               e.preventDefault();
               setSel((s) => Math.max(s - 1, 0));
             } else if (e.key === "Enter") {
-              const t = list[sel];
-              if (t) onPick(t.id);
+              const t = entries[sel];
+              if (t) {
+                t.run();
+                if (t.kind === "action") onClose();
+              }
             } else if (e.key === "Escape") {
               onClose();
             }
           }}
         />
         <div className="palette-list">
-          {list.map((t, i) => {
-            const Icon = t.icon;
+          {entries.map((e, i) => {
+            const tool = e.kind === "tool" ? tools.find((t) => t.id === e.id) : null;
+            const Icon = tool?.icon;
             return (
               <div
-                key={t.id}
+                key={e.id}
                 className={`palette-item${i === sel ? " active" : ""}`}
                 onMouseEnter={() => setSel(i)}
-                onClick={() => onPick(t.id)}
+                onClick={() => {
+                  e.run();
+                  if (e.kind === "action") onClose();
+                }}
               >
                 <span className="tool-icon">
-                  <Icon size={15} />
+                  {Icon ? (
+                    <Icon size={15} />
+                  ) : (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path
+                        d="M13 2L4.5 13.5H11L9.5 22L19.5 9.5H12.5z"
+                        fill="#06a7ff"
+                      />
+                    </svg>
+                  )}
                 </span>
-                <span className="palette-name">{t.name}</span>
-                <span className="palette-desc">{t.desc}</span>
-                <span
-                  className={`palette-fav${favs.includes(t.id) ? " on" : ""}`}
-                  role="button"
-                  title={favs.includes(t.id) ? "取消常用" : "设为常用"}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleFav(t.id);
-                  }}
-                >
-                  {favs.includes(t.id) ? "★" : "☆"}
-                </span>
+                <span className="palette-name">{e.name}</span>
+                <span className="palette-desc">{e.desc}</span>
+                {e.kind === "action" && <span className="palette-tag">动作</span>}
+                {tool && (
+                  <span
+                    className={`palette-fav${favs.includes(tool.id) ? " on" : ""}`}
+                    role="button"
+                    title={favs.includes(tool.id) ? "取消常用" : "设为常用"}
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      onToggleFav(tool.id);
+                    }}
+                  >
+                    {favs.includes(tool.id) ? "★" : "☆"}
+                  </span>
+                )}
               </div>
             );
           })}
-          {list.length === 0 && <div className="palette-empty">没有匹配的工具</div>}
+          {entries.length === 0 && <div className="palette-empty">没有匹配的工具</div>}
         </div>
         <div className="palette-foot">
           <span>↑↓ 选择 · Enter 打开 · Esc 关闭</span>

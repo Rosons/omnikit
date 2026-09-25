@@ -2497,3 +2497,14 @@ input[type="checkbox"]:checked::after {
   min-width: 44px;
   text-align: left;
 }
+
+/* 命令面板:动作条目的小标签 */
+.palette-tag {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: var(--fill-2);
+  color: var(--text-2);
+  font-size: 11px;
+  flex: none;
+}

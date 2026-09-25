@@ -115,6 +115,7 @@ pub fn run() {
             settings::settings_set,
             clip::clip_list,
             clip::clip_set_paused,
+            clip::clip_toggle_pause,
             clip::clip_set_persist,
             clip::clip_write,
             clip::clip_remove,

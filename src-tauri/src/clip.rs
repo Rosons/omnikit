@@ -387,6 +387,14 @@ pub fn clip_set_paused(state: tauri::State<'_, ClipState>, paused: bool) -> Resu
     Ok(())
 }
 
+/// 反转监听暂停状态,返回新的 paused 值(命令面板的开关动作用)
+#[tauri::command]
+pub fn clip_toggle_pause(state: tauri::State<'_, ClipState>) -> Result<bool, String> {
+    let now = !state.paused.load(Ordering::Relaxed);
+    state.paused.store(now, Ordering::Relaxed);
+    Ok(now)
+}
+
 #[tauri::command]
 pub fn clip_write(state: tauri::State<'_, ClipState>, id: u64) -> Result<(), String> {
     let item = {

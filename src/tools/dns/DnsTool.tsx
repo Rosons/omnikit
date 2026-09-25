@@ -163,7 +163,7 @@ export default function DnsTool() {
               {r.reply && (
                 <details className="dns-raw">
                   <summary>原始输出</summary>
-                  <pre className="dns-raw-pre">{r.reply.raw}</pre>
+                  <pre className="dns-raw-pre">{r.reply.raw.trimEnd()}</pre>
                 </details>
               )}
             </div>

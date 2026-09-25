@@ -126,10 +126,12 @@ fn hostname_of(ip: &str) -> String {
         }
     };
     let Some(mut out) = stdout else { return String::new() };
-    let mut text = String::new();
-    if std::io::Read::read_to_string(&mut out, &mut text).is_err() {
+    // GBK 字节流按字节读再统一解码,read_to_string 会因非 UTF-8 整体失败
+    let mut buf = Vec::new();
+    if std::io::Read::read_to_end(&mut out, &mut buf).is_err() {
         return String::new();
     }
+    let text = crate::dns::decode_child_output(&buf);
     for line in text.lines() {
         let t = line.trim();
         // 名字行前缀兼容中英文 nslookup 输出,剥掉前缀与冒号取名字

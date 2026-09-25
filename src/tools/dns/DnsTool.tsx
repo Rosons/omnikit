@@ -129,7 +129,14 @@ export default function DnsTool() {
         </div>
       </div>
 
-      {results && (
+      {busy && (
+        <div className="empty-state">
+          <div className="empty-title">查询中，正在向 {servers.length} 个服务器发起解析…</div>
+          <div className="hint">一般 1～3 秒返回；境外服务器在部分网络下可能较慢或超时</div>
+        </div>
+      )}
+
+      {results && !busy && (
         <div className="dns-results">
           {results.map((r) => (
             <div className="field" key={r.server}>

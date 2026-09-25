@@ -23,16 +23,34 @@ pub struct DnsReply {
     pub raw: String,
 }
 
+/// 子进程输出解码:中文 Windows 的控制台程序输出 GBK,macOS 为 UTF-8
+pub(crate) fn decode_child_output(buf: &[u8]) -> String {
+    #[cfg(target_os = "windows")]
+    {
+        let (text, _, _) = encoding_rs::GBK.decode(buf);
+        text.into_owned()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        String::from_utf8_lossy(buf).into_owned()
+    }
+}
+
+/// 运行子进程并取解码后的 stdout。输出在独立线程读取(轮询等待期间
+/// 管道持续有数据也不阻塞),超时 kill 后管道关闭、线程自然结束
 pub(crate) fn run_gbk_output(mut cmd: Command, timeout: Duration) -> Option<String> {
     cmd.stdout(Stdio::piped()).stderr(Stdio::null());
     let mut child = cmd.spawn().ok()?;
+    let mut pipe = child.stdout.take()?;
+    let reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = std::io::Read::read_to_end(&mut pipe, &mut buf);
+        buf
+    });
     let deadline = Instant::now() + timeout;
-    let mut stdout = loop {
+    loop {
         match child.try_wait() {
-            Ok(Some(_)) => {
-                let _ = child.wait();
-                break child.stdout.take();
-            }
+            Ok(Some(_)) => break,
             Ok(None) if Instant::now() >= deadline => {
                 let _ = child.kill();
                 let _ = child.wait();
@@ -41,18 +59,9 @@ pub(crate) fn run_gbk_output(mut cmd: Command, timeout: Duration) -> Option<Stri
             Ok(None) => std::thread::sleep(Duration::from_millis(40)),
             Err(_) => return None,
         }
-    }?;
-    let mut text = String::new();
-    Read::read_to_string(&mut stdout, &mut text).ok()?;
-    Some(decode_output(stdout))
-}
-
-fn decode_output(bytes: std::process::ChildStdout) -> String {
-    let mut buf = Vec::new();
-    let mut r = bytes;
-    let _ = r.read_to_end(&mut buf);
-    let (text, _, _) = encoding_rs::GBK.decode(&buf);
-    text.into_owned()
+    }
+    let buf = reader.join().ok()?;
+    Some(decode_child_output(&buf))
 }
 
 /// 取一行 "键: 值" 中冒号后的部分(兼容全角冒号,按字符边界切)
@@ -181,15 +190,10 @@ pub fn dns_query(domain: String, qtype: String, server: String) -> Result<DnsRep
     if !valid_token(&srv) {
         return Err(format!("服务器地址不合法：{server}"));
     }
-    let out = run_gbk_output(
-        {
-            let mut c = Command::new("nslookup");
-            c.arg(format!("-type={qt}")).arg(&d).arg(&srv);
-            c
-        },
-        QUERY_TIMEOUT,
-    )
-    .ok_or_else(|| "查询超时或 nslookup 不可用".to_string())?;
+    let mut cmd = crate::commands::hidden_command("nslookup");
+    cmd.arg(format!("-type={qt}")).arg(&d).arg(&srv);
+    let out = run_gbk_output(cmd, QUERY_TIMEOUT)
+        .ok_or_else(|| "查询超时或 nslookup 不可用".to_string())?;
     let records = parse_nslookup(&out, &qt);
     Ok(DnsReply { server: srv, records, raw: out })
 }

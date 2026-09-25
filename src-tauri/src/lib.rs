@@ -92,6 +92,7 @@ pub fn run() {
             commands::updater_download,
             commands::open_url,
             commands::open_log_dir,
+            commands::tray_set_favs,
             commands::log_append,
             commands::restart_app,
             settings::settings_get,
@@ -197,7 +198,16 @@ pub fn run() {
                         let _ = app.emit("omnikit://goto", "clip");
                     }
                     "quit" => app.exit(0),
-                    _ => {}
+                    // 收藏工具直达:恢复窗口并通知前端切页(fav: 前缀 + 工具 id)
+                    other => {
+                        if let Some(id) = other.strip_prefix("fav:") {
+                            if let Some(w) = app.get_webview_window("main") {
+                                let _ = w.show();
+                                let _ = w.set_focus();
+                            }
+                            let _ = app.emit("omnikit://goto", id);
+                        }
+                    }
                 })
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {

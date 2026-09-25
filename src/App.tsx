@@ -2,6 +2,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { tools, GROUPS, type ToolGroup, type ToolModule } from "./tools/registry";
 import { ToastHost, showToast } from "./components/Toast";
 import { ConfirmHost } from "./components/ConfirmDialog";
@@ -46,6 +47,10 @@ export default function App() {
   const ActiveComponent = active.component;
   const [collapsed, setCollapsed] = useState<Set<ToolGroup>>(loadCollapsed);
   const [favs, setFavs] = useState<string[]>(loadFavs);
+  // 窗口置顶:启动恢复上次选择
+  const [pinned, setPinned] = useState(
+    () => localStorage.getItem("omnikit.alwaysOnTop") === "on",
+  );
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [version, setVersion] = useState("");
 
@@ -152,6 +157,30 @@ export default function App() {
       localStorage.setItem(FAVS_KEY, JSON.stringify(next));
       return next;
     });
+  }
+
+  // 收藏变化后重建托盘右键菜单,收藏工具点一下直达
+  useEffect(() => {
+    const items = favs
+      .map((id) => tools.find((t) => t.id === id))
+      .filter((t): t is ToolModule => Boolean(t))
+      .map((t) => [t.id, t.name] as [string, string]);
+    invoke("tray_set_favs", { favs: items }).catch(() => {});
+  }, [favs]);
+
+  // 启动时恢复置顶状态
+  useEffect(() => {
+    if (pinned) getCurrentWindow().setAlwaysOnTop(true).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function togglePin() {
+    const v = !pinned;
+    setPinned(v);
+    localStorage.setItem("omnikit.alwaysOnTop", v ? "on" : "off");
+    getCurrentWindow()
+      .setAlwaysOnTop(v)
+      .catch((e) => showToast(String(e), "error"));
   }
 
   function toggleGroup(g: ToolGroup) {
@@ -279,6 +308,21 @@ export default function App() {
             title="快速打开工具"
           >
             快速打开 <span className="kbd">Ctrl K</span>
+          </button>
+          <button
+            className={`btn btn-sm${pinned ? " btn-selected" : ""}`}
+            onClick={togglePin}
+            title={pinned ? "取消窗口置顶" : "窗口置顶，悬浮在其他应用上面"}
+            aria-pressed={pinned}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M14.5 2.5l7 7-2.6 1a4 4 0 0 0-2.3 2.2l-1.4 3.5a1 1 0 0 1-1.65.35L9.4 12.4 3.6 18.2a1 1 0 0 1-1.4-1.4l5.8-5.8-4.15-4.15a1 1 0 0 1 .35-1.65L7.7 3.8a4 4 0 0 0 2.2-2.3z"
+                fill="currentColor"
+                transform={pinned ? "rotate(45 12 12)" : undefined}
+              />
+            </svg>
+            置顶
           </button>
         </header>
         <div className="main-body">

@@ -1667,6 +1667,43 @@ pub fn open_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 前端收藏变化后重建托盘右键菜单;收藏项 id 加 fav: 前缀,
+/// 点击时由 lib.rs 的菜单事件处理恢复窗口并发 omnikit://goto 切页
+#[tauri::command]
+pub fn tray_set_favs(app: AppHandle, favs: Vec<(String, String)>) -> Result<(), String> {
+    use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem};
+    let tray = app
+        .tray_by_id("main-tray")
+        .ok_or_else(|| "托盘未初始化".to_string())?;
+    let show = MenuItem::with_id(&app, "show", "显示 OmniKit", true, None::<&str>)
+        .map_err(|e| e.to_string())?;
+    let clip = MenuItem::with_id(&app, "clip", "剪贴板历史", true, None::<&str>)
+        .map_err(|e| e.to_string())?;
+    let quit =
+        MenuItem::with_id(&app, "quit", "退出", true, None::<&str>).map_err(|e| e.to_string())?;
+    let sep_a = PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?;
+    let sep_b = PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?;
+    let sep_c = PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?;
+    let fav_items: Vec<MenuItem<_>> = favs
+        .iter()
+        .map(|(id, name)| {
+            MenuItem::with_id(&app, format!("fav:{id}"), name, true, None::<&str>)
+                .map_err(|e| e.to_string())
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    let mut list: Vec<&dyn IsMenuItem<_>> = vec![&show, &sep_a, &clip];
+    if !fav_items.is_empty() {
+        list.push(&sep_b);
+        for f in &fav_items {
+            list.push(f);
+        }
+    }
+    list.push(&sep_c);
+    list.push(&quit);
+    let menu = Menu::with_items(&app, &list).map_err(|e| e.to_string())?;
+    tray.set_menu(Some(menu)).map_err(|e| e.to_string())
+}
+
 /// 打开应用数据目录下的 logs 目录(存放前端错误日志)
 #[tauri::command]
 pub fn open_log_dir(app: AppHandle) -> Result<(), String> {

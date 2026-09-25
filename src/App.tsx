@@ -47,10 +47,11 @@ export default function App() {
   const ActiveComponent = active.component;
   const [collapsed, setCollapsed] = useState<Set<ToolGroup>>(loadCollapsed);
   const [favs, setFavs] = useState<string[]>(loadFavs);
-  // 窗口置顶:启动恢复上次选择
+  // 自定义标题栏:窗口置顶与最大化状态
   const [pinned, setPinned] = useState(
     () => localStorage.getItem("omnikit.alwaysOnTop") === "on",
   );
+  const [isMax, setIsMax] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [version, setVersion] = useState("");
 
@@ -170,7 +171,15 @@ export default function App() {
 
   // 启动时恢复置顶状态
   useEffect(() => {
-    if (pinned) getCurrentWindow().setAlwaysOnTop(true).catch(() => {});
+    const w = getCurrentWindow();
+    if (pinned) w.setAlwaysOnTop(true).catch(() => {});
+    w.isMaximized().then(setIsMax).catch(() => {});
+    const un = w.onResized(() => {
+      w.isMaximized().then(setIsMax).catch(() => {});
+    });
+    return () => {
+      un.then((fn) => fn());
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -181,6 +190,17 @@ export default function App() {
     getCurrentWindow()
       .setAlwaysOnTop(v)
       .catch((e) => showToast(String(e), "error"));
+  }
+
+  function titlebarDown(e: React.MouseEvent) {
+    // 左键按住空白处拖动窗口;点在按钮上不触发
+    if (e.button !== 0 || (e.target as HTMLElement).closest("button")) return;
+    getCurrentWindow().startDragging().catch(() => {});
+  }
+
+  function titlebarDbl(e: React.MouseEvent) {
+    if ((e.target as HTMLElement).closest("button")) return;
+    getCurrentWindow().toggleMaximize().catch(() => {});
   }
 
   function toggleGroup(g: ToolGroup) {
@@ -224,6 +244,64 @@ export default function App() {
 
   return (
     <div className="app">
+      <div className="titlebar" onMouseDown={titlebarDown} onDoubleClick={titlebarDbl}>
+        <span className="titlebar-title">OmniKit</span>
+        <div className="win-controls">
+          <button
+            className={`win-btn${pinned ? " on" : ""}`}
+            onClick={togglePin}
+            title={pinned ? "取消窗口置顶" : "窗口置顶，悬浮在其他应用上面"}
+            aria-pressed={pinned}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M14.5 2.5l7 7-2.6 1a4 4 0 0 0-2.3 2.2l-1.4 3.5a1 1 0 0 1-1.65.35L9.4 12.4 3.6 18.2a1 1 0 0 1-1.4-1.4l5.8-5.8-4.15-4.15a1 1 0 0 1 .35-1.65L7.7 3.8a4 4 0 0 0 2.2-2.3z"
+                fill="currentColor"
+                transform={pinned ? "rotate(45 12 12)" : undefined}
+              />
+            </svg>
+          </button>
+          <button
+            className="win-btn"
+            onClick={() => getCurrentWindow().minimize().catch(() => {})}
+            title="最小化"
+          >
+            <svg width="11" height="11" viewBox="0 0 10 10" aria-hidden>
+              <path d="M1.5 5h7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+          </button>
+          <button
+            className="win-btn"
+            onClick={() => getCurrentWindow().toggleMaximize().catch(() => {})}
+            title={isMax ? "向下还原" : "最大化"}
+          >
+            {isMax ? (
+              <svg width="11" height="11" viewBox="0 0 10 10" fill="none" aria-hidden>
+                <rect x="1" y="3" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" />
+                <path d="M3.2 1.2h4.6a1 1 0 0 1 1 1v4.6" stroke="currentColor" strokeWidth="1.2" />
+              </svg>
+            ) : (
+              <svg width="11" height="11" viewBox="0 0 10 10" fill="none" aria-hidden>
+                <rect x="1.8" y="1.8" width="6.4" height="6.4" rx="1" stroke="currentColor" strokeWidth="1.2" />
+              </svg>
+            )}
+          </button>
+          <button
+            className="win-btn win-close"
+            onClick={() => getCurrentWindow().close().catch(() => {})}
+            title="关闭"
+          >
+            <svg width="11" height="11" viewBox="0 0 10 10" aria-hidden>
+              <path
+                d="M1.8 1.8l6.4 6.4M8.2 1.8L1.8 8.2"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">
@@ -308,21 +386,6 @@ export default function App() {
             title="快速打开工具"
           >
             快速打开 <span className="kbd">Ctrl K</span>
-          </button>
-          <button
-            className={`btn btn-sm${pinned ? " btn-selected" : ""}`}
-            onClick={togglePin}
-            title={pinned ? "取消窗口置顶" : "窗口置顶，悬浮在其他应用上面"}
-            aria-pressed={pinned}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path
-                d="M14.5 2.5l7 7-2.6 1a4 4 0 0 0-2.3 2.2l-1.4 3.5a1 1 0 0 1-1.65.35L9.4 12.4 3.6 18.2a1 1 0 0 1-1.4-1.4l5.8-5.8-4.15-4.15a1 1 0 0 1 .35-1.65L7.7 3.8a4 4 0 0 0 2.2-2.3z"
-                fill="currentColor"
-                transform={pinned ? "rotate(45 12 12)" : undefined}
-              />
-            </svg>
-            置顶
           </button>
         </header>
         <div className="main-body">

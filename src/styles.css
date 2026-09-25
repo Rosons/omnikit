@@ -70,9 +70,47 @@ body {
 .app {
   display: grid;
   grid-template-columns: 216px 1fr;
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: 36px minmax(0, 1fr);
   height: 100%;
 }
+
+/* ---------- 自定义标题栏 ---------- */
+.titlebar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: stretch;
+  height: 36px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.titlebar-title {
+  align-self: center;
+  padding-left: 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-2);
+  pointer-events: none;
+}
+.win-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: stretch;
+}
+.win-btn {
+  width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: default;
+  transition: background var(--fast), color var(--fast);
+}
+.win-btn:hover { background: var(--fill-2); color: var(--text-1); }
+.win-btn.on { color: var(--primary); }
+.win-btn.on:hover { background: var(--fill-2); color: var(--primary); }
+.win-close:hover { background: #e81123; color: #fff; }
 
 /* ---------- 侧边栏 ---------- */
 .sidebar {

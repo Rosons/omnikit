@@ -2368,8 +2368,9 @@ details.mcp-log pre {
 .dns-domain { flex: 1; min-width: 0; }
 .dns-servers { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dns-custom { width: 180px; }
-/* 结果块(每台服务器一个 field)之间的间距与页面 stack 一致 */
-.dns-results { display: flex; flex-direction: column; gap: var(--sp-4); }
+/* 原始输出与上方记录、与下一服务器块均取 12px,上下等距 */
+.dns-results { display: flex; flex-direction: column; gap: var(--sp-3); }
+.dns-raw { margin-top: var(--sp-3); }
 .dns-raw summary {
   cursor: default;
   color: var(--text-2);

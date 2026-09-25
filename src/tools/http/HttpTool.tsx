@@ -277,7 +277,7 @@ export default function HttpTool() {
           超时
           <input
             className="input input-sm"
-            style={{ width: 62, marginLeft: 6 }}
+            style={{ width: 72, marginLeft: 6 }}
             type="number"
             min={1}
             max={300}

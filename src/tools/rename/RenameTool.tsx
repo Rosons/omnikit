@@ -161,7 +161,7 @@ export default function RenameTool() {
             <span className="kv-k">起始</span>
             <input
               className="input input-sm"
-              style={{ width: 56 }}
+              style={{ width: 76 }}
               type="number"
               min={0}
               value={rule.seqStart}
@@ -170,7 +170,7 @@ export default function RenameTool() {
             <span className="kv-k">位数</span>
             <input
               className="input input-sm"
-              style={{ width: 56 }}
+              style={{ width: 64 }}
               type="number"
               min={1}
               max={6}

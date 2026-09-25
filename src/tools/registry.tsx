@@ -153,6 +153,14 @@ export const tools: ToolModule[] = [
     component: lazy(() => import("./fsearch/FileSearchTool")),
   },
   {
+    id: "lan",
+    group: "system" as ToolGroup,
+    name: "局域网扫描",
+    desc: "网段内存活主机与开放端口",
+    icon: LanIcon,
+    component: lazy(() => import("./lan/LanTool")),
+  },
+  {
     id: "monitor",
     group: "system" as ToolGroup,
     name: "系统监控",
@@ -434,6 +442,25 @@ function LockIcon({ size = 16 }: { size?: number }) {
       <rect x="4" y="10" width="16" height="10.5" rx="3" fill="#06a7ff" />
       <circle cx="12" cy="14.6" r="1.7" fill="#ffffff" />
       <path d="M12 15.5v2.4" stroke="#ffffff" strokeWidth="1.9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function LanIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"
+        fill="#06a7ff"
+      />
+      <g stroke="#06a7ff" strokeWidth="1.8" strokeLinecap="round" fill="none">
+        <path d="M8.5 15.5a5 5 0 0 1 0-7" />
+        <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+      </g>
+      <g stroke="#9fcdfb" strokeWidth="1.8" strokeLinecap="round" fill="none">
+        <path d="M5.6 18.4a9 9 0 0 1 0-12.8" />
+        <path d="M18.4 5.6a9 9 0 0 1 0 12.8" />
+      </g>
     </svg>
   );
 }

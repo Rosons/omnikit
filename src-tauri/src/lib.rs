@@ -4,6 +4,7 @@ mod crypto;
 mod error;
 mod format;
 mod history;
+mod lan;
 mod mcp;
 mod pack;
 mod search;
@@ -59,6 +60,7 @@ pub fn run() {
         .manage(commands::TailState::default())
         .manage(ClipState::default())
         .manage(SearchState::default())
+        .manage(lan::LanState::default())
         .invoke_handler(tauri::generate_handler![
             commands::sb_encrypt,
             commands::sb_decrypt,
@@ -93,6 +95,9 @@ pub fn run() {
             commands::open_url,
             commands::open_log_dir,
             commands::tray_set_favs,
+            lan::lan_local_ip,
+            lan::lan_probe_start,
+            lan::lan_probe_stop,
             commands::log_append,
             commands::restart_app,
             settings::settings_get,

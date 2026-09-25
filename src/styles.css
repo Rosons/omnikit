@@ -2308,3 +2308,19 @@ details.mcp-log pre {
 [data-theme="dark"] .sql-out .token.function { color: #d2a8ff; }
 [data-theme="dark"] .sql-out .token.number,
 [data-theme="dark"] .sql-out .token.boolean { color: #ffa657; }
+
+/* ===== 局域网扫描 ===== */
+.lan-flex-none { flex: none; }
+.lan-row { display: flex; align-items: center; gap: 10px; }
+.lan-ports { display: flex; gap: 4px; flex-wrap: wrap; max-width: 260px; }
+.lan-port {
+  padding: 1px 7px;
+  background: var(--fill-2);
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  color: var(--text-2);
+}
+.lan-guess { color: var(--text-2); flex: none; }
+.lan-guess.lan-guess-dev { color: var(--primary); }
+.lan-guess.lan-guess-svc { color: var(--success); }

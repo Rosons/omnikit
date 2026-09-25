@@ -169,6 +169,14 @@ export const tools: ToolModule[] = [
     component: lazy(() => import("./lan/LanTool")),
   },
   {
+    id: "csv",
+    group: "dev" as ToolGroup,
+    name: "CSV 查看器",
+    desc: "表格浏览、筛选与列概况",
+    icon: CsvIcon,
+    component: lazy(() => import("./csv/CsvTool")),
+  },
+  {
     id: "dns",
     group: "system" as ToolGroup,
     name: "DNS 查询",
@@ -504,6 +512,16 @@ function DnsIcon({ size = 16 }: { size?: number }) {
       <circle cx="12" cy="12" r="9" stroke="#06a7ff" strokeWidth="2" fill="none" />
       <ellipse cx="12" cy="12" rx="4" ry="9" stroke="#06a7ff" strokeWidth="1.6" fill="none" />
       <path d="M3.5 9.5h17M3.5 14.5h17" stroke="#06a7ff" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+function CsvIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3" y="4" width="18" height="16" rx="2" fill="#9fcdfb" />
+      <rect x="3" y="4" width="18" height="4.5" rx="2" fill="#06a7ff" />
+      <path d="M3 12.8h18M3 16.4h18M9.5 8.5v11.5M15.5 8.5v11.5" stroke="#06a7ff" strokeWidth="1.4" />
     </svg>
   );
 }

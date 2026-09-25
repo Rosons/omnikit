@@ -2,6 +2,7 @@ mod clip;
 mod commands;
 mod dns;
 mod crypto;
+mod csvtool;
 mod error;
 mod format;
 mod history;
@@ -100,6 +101,9 @@ pub fn run() {
             commands::tray_set_favs,
             lan::lan_local_ip,
             dns::dns_query,
+            csvtool::csv_open,
+            csvtool::csv_rows,
+            csvtool::csv_stats,
             lan::lan_probe_start,
             lan::lan_probe_stop,
             commands::log_append,

@@ -2377,3 +2377,36 @@ details.mcp-log pre {
   min-height: 0;
   white-space: pre-wrap;
 }
+
+/* ===== CSV 查看器 ===== */
+.csv-flex-none { flex: none; }
+.csv-row { display: flex; align-items: center; gap: 10px; }
+.csv-path { flex: 1; min-width: 0; }
+.csv-filter { width: 220px; }
+.csv-table-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  overflow: auto;
+  max-height: 480px;
+}
+.csv-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+.csv-table th,
+.csv-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.csv-table th {
+  position: sticky;
+  top: 0;
+  background: var(--fill-2);
+  color: var(--text-2);
+  font-weight: 500;
+  z-index: 1;
+}
+.csv-idx { color: var(--text-3); width: 52px; text-align: right; }
+.csv-empty { color: var(--text-3); }

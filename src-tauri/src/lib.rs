@@ -1,5 +1,6 @@
 mod clip;
 mod commands;
+mod dns;
 mod crypto;
 mod error;
 mod format;
@@ -98,6 +99,7 @@ pub fn run() {
             commands::open_log_dir,
             commands::tray_set_favs,
             lan::lan_local_ip,
+            dns::dns_query,
             lan::lan_probe_start,
             lan::lan_probe_stop,
             commands::log_append,

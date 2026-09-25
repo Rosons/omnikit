@@ -23,9 +23,14 @@ for (const f of files) {
   // 整文件剥离块注释(支持跨行),再按行处理
   text = text.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
   const lines = text.split(/\r?\n/);
+  // 测试模块内的样例常量是外部程序输出的逐字拷贝(如 nslookup),从
+  // #[cfg(test)] 起整段豁免(本项目惯例测试模块总在文件尾部)
+  let inTests = false;
   lines.forEach((line, i) => {
     let t = line;
     if (f.endsWith(".rs")) {
+      if (t.includes("#[cfg(test)]")) inTests = true;
+      if (inTests) return;
       t = t.replace(/\/\/.*$/, "");
       // fn 签名行是代码标识符(如中文测试名),不是文案,跳过
       if (/^\s*(pub\s+)?(async\s+)?fn\s/.test(t)) return;

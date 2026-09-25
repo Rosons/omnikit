@@ -169,6 +169,14 @@ export const tools: ToolModule[] = [
     component: lazy(() => import("./lan/LanTool")),
   },
   {
+    id: "dns",
+    group: "system" as ToolGroup,
+    name: "DNS 查询",
+    desc: "多 DNS 服务器解析结果对比",
+    icon: DnsIcon,
+    component: lazy(() => import("./dns/DnsTool")),
+  },
+  {
     id: "monitor",
     group: "system" as ToolGroup,
     name: "系统监控",
@@ -484,6 +492,18 @@ function RenameIcon({ size = 16 }: { size?: number }) {
         <path d="M6.5 15.5h3.5" />
       </g>
       <path d="M13 6l4.5 12" stroke="#06a7ff" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function DnsIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" fill="#9fcdfb" />
+      <path d="M12 3a9 9 0 0 1 9 9h-9z" fill="#06a7ff" />
+      <circle cx="12" cy="12" r="9" stroke="#06a7ff" strokeWidth="2" fill="none" />
+      <ellipse cx="12" cy="12" rx="4" ry="9" stroke="#06a7ff" strokeWidth="1.6" fill="none" />
+      <path d="M3.5 9.5h17M3.5 14.5h17" stroke="#06a7ff" strokeWidth="1.6" />
     </svg>
   );
 }

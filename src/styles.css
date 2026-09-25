@@ -2361,3 +2361,19 @@ details.mcp-log pre {
 .rename-to.rename-bad { color: var(--danger); }
 .rename-to em { font-style: normal; font-size: 11.5px; }
 .rename-size { width: 70px; text-align: right; flex: none; }
+
+/* ===== DNS 查询 ===== */
+.dns-flex-none { flex: none; }
+.dns-row { display: flex; align-items: center; gap: 10px; }
+.dns-domain { flex: 1; min-width: 0; }
+.dns-servers { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dns-custom { width: 180px; }
+.dns-raw summary { cursor: default; }
+.dns-raw-pre {
+  height: auto;
+  max-height: 220px;
+  overflow: auto;
+  margin-top: 8px;
+  min-height: 0;
+  white-space: pre-wrap;
+}

@@ -118,7 +118,7 @@ export default function CsvTool() {
             spellCheck={false}
           />
           <button className="btn" onClick={pickFile}>
-            选择…
+            选择
           </button>
         </div>
         {meta && (

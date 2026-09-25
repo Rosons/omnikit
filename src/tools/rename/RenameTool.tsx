@@ -92,7 +92,7 @@ export default function RenameTool() {
             spellCheck={false}
           />
           <button className="btn" onClick={pickDir}>
-            选择…
+            选择
           </button>
         </div>
         <span className="hint">只处理文件夹里的普通文件，子文件夹不参与</span>

@@ -142,7 +142,7 @@ export default function HexTool() {
             spellCheck={false}
           />
           <button className="btn" onClick={pickFile}>
-            选择…
+            选择
           </button>
         </div>
         {total > 0 && (

@@ -2530,3 +2530,24 @@ input[type="checkbox"]:checked::after {
 }
 .mcp-right { min-width: 0; }
 .mcp-out { max-height: 320px; overflow: auto; }
+
+/* MCP 服务器使用说明:默认折叠,展开后限高滚动 */
+.mcp-instructions summary {
+  cursor: default;
+  color: var(--text-2);
+  font-size: 12px;
+  user-select: none;
+}
+.mcp-instructions pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: var(--fill);
+  border-radius: var(--radius-s);
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2);
+}

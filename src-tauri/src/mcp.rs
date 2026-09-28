@@ -11,7 +11,9 @@ use std::time::{Duration, Instant};
 use crate::commands::hidden_command;
 
 const PROTOCOL_VERSION: &str = "2025-06-18";
-const TIMEOUT: Duration = Duration::from_secs(30);
+const TIMEOUT: Duration = Duration::from_secs(90);
+/// TCP/TLS 连接超时:国内直连境外端点时常超时,快速失败便于重试
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
 const LOG_CAP: usize = 200;
 
 #[derive(Default)]
@@ -195,7 +197,11 @@ impl McpSession {
 }
 
 fn http_post(s: &HttpSession, msg: &Value, expect_reply: bool) -> Result<Value, String> {
-    let mut req = ureq::post(&s.url)
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(CONNECT_TIMEOUT)
+        .build();
+    let mut req = agent
+        .post(&s.url)
         // JSON-RPC 必须声明 JSON 体;ureq send_string 默认 text/plain,会被规范严格的服务端 400 拒掉
         .set("Content-Type", "application/json")
         .set("Accept", "application/json, text/event-stream")

@@ -378,9 +378,10 @@ export default function McpTool() {
       )}
 
       {info?.instructions && (
-        <div className="notice notice-info">
-          <span className="notice-text">{info.instructions}</span>
-        </div>
+        <details className="mcp-instructions">
+          <summary>服务器使用说明（点击展开）</summary>
+          <pre>{info.instructions}</pre>
+        </details>
       )}
 
       {tools && (

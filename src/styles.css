@@ -436,6 +436,8 @@ body {
   min-height: 0;
   overflow-y: auto;
   padding: var(--sp-5) clamp(16px, 3vw, var(--sp-6));
+  display: flex;
+  flex-direction: column;
 }
 
 /* ==================== 卡片 ==================== */
@@ -2511,8 +2513,8 @@ input[type="checkbox"]:checked::after {
   flex: none;
 }
 
-/* ===== MCP 调试工作台:页面占满可用高(不出页面滚动条),左能力导航 + 右调用台 ===== */
-.mcp-page { height: 100%; }
+/* ===== MCP 调试工作台:页面 flex 占满内容区(不出页面滚动条),左能力导航 + 右调用台 ===== */
+.mcp-page { flex: 1; min-height: 0; }
 .mcp-work {
   flex: 1;
   min-height: 320px;
@@ -2644,9 +2646,20 @@ input[type="checkbox"]:checked::after {
 }
 .mcp-sec-label { font-size: 12px; font-weight: 500; color: var(--text-2); }
 .mcp-sec-row { display: flex; align-items: center; gap: 12px; }
-/* 结果行操作用链接样式:纯彩色文本,悬停下划线,无按钮内边距 */
-.mcp-result-sec .btn-text { padding: 0; background: none; }
-.mcp-result-sec .btn-text:hover { background: none; text-decoration: underline; }
+/* MCP 内的文本操作:纯主题色文字,无按钮感、无下划线,悬停颜色加深 */
+.mcp-bench-body .btn-text,
+.mcp-result-sec .btn-text,
+.mcp-log-modal .tool-actions .btn-text {
+  padding: 0;
+  background: none;
+}
+.mcp-bench-body .btn-text:hover,
+.mcp-result-sec .btn-text:hover,
+.mcp-log-modal .tool-actions .btn-text:hover {
+  background: none;
+  text-decoration: none;
+  color: var(--text-1);
+}
 .mcp-result {
   flex: 1;
   min-height: 0;

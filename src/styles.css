@@ -1936,19 +1936,22 @@ body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-/* JSON-RPC 日志弹窗(低频调试入口,大窗阅读) */
+/* JSON-RPC 日志/参数 Schema 弹窗:宽高随窗口与内容自适应 */
 .mcp-log-modal {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: min(860px, 88vw);
-  height: 72vh;
+  width: min(1100px, 86vw);
+  height: auto;
+  max-height: 78vh;
   background: var(--card);
   border-radius: var(--radius-m);
   padding: 16px;
 }
 .mcp-log-pre {
   flex: 1;
+  min-height: 0;
+  max-height: calc(78vh - 130px);
   margin: 0;
   padding: 10px 12px;
   background: var(--fill);
@@ -2628,11 +2631,12 @@ input[type="checkbox"]:checked::after {
   flex-direction: column;
   gap: 10px;
 }
-/* 参数编辑器填满所在分区,不再留底部空白 */
+/* 参数编辑器贴内容自适应:小参数不撑大框,大参数到分区上限后内部滚动 */
 .mcp-args {
-  flex: 1;
-  min-height: 140px;
-  resize: none;
+  field-sizing: content;
+  min-height: 96px;
+  max-height: 100%;
+  resize: vertical;
 }
 /* 结果区固定占工作台下部,与参数区各自滚动;有结果才出现 */
 .mcp-result-sec {
@@ -2647,7 +2651,7 @@ input[type="checkbox"]:checked::after {
 .mcp-sec-label { font-size: 12px; font-weight: 500; color: var(--text-2); }
 .mcp-sec-row { display: flex; align-items: center; gap: 12px; }
 /* 结果行相邻文字按钮内边距收紧,避免叠出大空隙 */
-.mcp-result-sec .btn-text { padding: 6px 6px; }
+.mcp-result-sec .btn-text { padding: 6px 8px; }
 .mcp-result {
   flex: 1;
   min-height: 0;

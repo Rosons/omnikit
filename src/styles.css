@@ -1941,7 +1941,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: min(1100px, 86vw);
+  width: clamp(520px, 70vw, 1500px);
   height: auto;
   max-height: 78vh;
   background: var(--card);
@@ -2641,7 +2641,7 @@ input[type="checkbox"]:checked::after {
 /* 结果区固定占工作台下部,与参数区各自滚动;有结果才出现 */
 .mcp-result-sec {
   flex: 1 1 45%;
-  min-height: 150px;
+  min-height: 190px;
   border-top: 1px solid var(--border);
   padding: 10px 14px 12px;
   display: flex;

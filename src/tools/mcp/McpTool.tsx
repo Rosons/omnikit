@@ -270,6 +270,9 @@ export default function McpTool() {
   }
 
   const schemaText = sel ? JSON.stringify(sel.schema, null, 2) : "";
+  // 参数框按内容行数自适应高度,不再留大片空白
+  const argsLines = args ? args.split("\n").length : 1;
+  const argsHeight = Math.min(320, Math.max(96, 16 + argsLines * 18));
   const filteredTools = tools?.filter((t) =>
     (t.name + (t.description ?? "")).toLowerCase().includes(toolQ.trim().toLowerCase()),
   );
@@ -514,7 +517,7 @@ export default function McpTool() {
                   <span className="mcp-sec-label">参数</span>
                   <textarea
                     className="textarea input-mono"
-                    style={{ height: 150 }}
+                    style={{ height: argsHeight }}
                     value={args}
                     onChange={(e) => setArgs(e.target.value)}
                     placeholder="工具参数 JSON"
@@ -524,32 +527,32 @@ export default function McpTool() {
                     <summary>参数 Schema</summary>
                     <pre>{schemaText || "（无）"}</pre>
                   </details>
-                  {result && (
-                    <>
-                      <div className="mcp-sec-row">
-                        <span className="mcp-sec-label">结果</span>
-                        <span className={`jwt-chip ${result.is_error ? "expired" : "valid"}`}>
-                          {result.is_error ? "失败" : "成功"} · {result.elapsed_ms} ms
-                        </span>
-                        <span style={{ flex: 1 }} />
-                        <button className="btn-text" onClick={() => setShowRaw((v) => !v)}>
-                          {showRaw ? "查看文本" : "查看原始 JSON"}
-                        </button>
-                        <CopyButton
-                          text={showRaw ? JSON.stringify(result.raw, null, 2) : result.text}
-                          label="复制结果"
-                        />
-                      </div>
-                      <div className="mcp-result">
-                        <pre>
-                          {showRaw
-                            ? JSON.stringify(result.raw, null, 2)
-                            : result.text || "（无文本内容）"}
-                        </pre>
-                      </div>
-                    </>
-                  )}
                 </div>
+                {result && (
+                  <div className="mcp-result-sec">
+                    <div className="mcp-sec-row">
+                      <span className="mcp-sec-label">结果</span>
+                      <span className={`jwt-chip ${result.is_error ? "expired" : "valid"}`}>
+                        {result.is_error ? "失败" : "成功"} · {result.elapsed_ms} ms
+                      </span>
+                      <span style={{ flex: 1 }} />
+                      <button className="btn-text" onClick={() => setShowRaw((v) => !v)}>
+                        {showRaw ? "查看文本" : "查看原始 JSON"}
+                      </button>
+                      <CopyButton
+                        text={showRaw ? JSON.stringify(result.raw, null, 2) : result.text}
+                        label="复制结果"
+                      />
+                    </div>
+                    <div className="mcp-result">
+                      <pre>
+                        {showRaw
+                          ? JSON.stringify(result.raw, null, 2)
+                          : result.text || "（无文本内容）"}
+                      </pre>
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <div className="mcp-bench-empty">

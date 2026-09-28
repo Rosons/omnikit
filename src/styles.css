@@ -2617,7 +2617,7 @@ input[type="checkbox"]:checked::after {
   white-space: nowrap;
 }
 .mcp-bench-body {
-  flex: 1;
+  flex: 1 1 55%;
   min-height: 0;
   overflow-y: auto;
   padding: 14px;
@@ -2625,17 +2625,28 @@ input[type="checkbox"]:checked::after {
   flex-direction: column;
   gap: 10px;
 }
+/* 结果区固定占工作台下部,与参数区各自滚动;有结果才出现 */
+.mcp-result-sec {
+  flex: 1 1 45%;
+  min-height: 150px;
+  border-top: 1px solid var(--border);
+  padding: 10px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .mcp-sec-label { font-size: 12px; font-weight: 500; color: var(--text-2); }
-.mcp-sec-row { display: flex; align-items: center; gap: 8px; }
-/* btn-text 自带 10px 左右内边距,相邻两个会叠出 28px 空隙;结果行收紧 */
-.mcp-sec-row .btn-text { padding: 6px 2px; }
+.mcp-sec-row { display: flex; align-items: center; gap: 12px; }
+/* 结果行操作用链接样式:纯彩色文本,悬停下划线,无按钮内边距 */
+.mcp-result-sec .btn-text { padding: 0; background: none; }
+.mcp-result-sec .btn-text:hover { background: none; text-decoration: underline; }
 .mcp-result {
+  flex: 1;
+  min-height: 0;
   margin: 0;
   padding: 10px 12px;
   background: var(--fill);
   border-radius: var(--radius-s);
-  /* 随屏幕高度自适应:小屏保底 240px,大屏最高 900px */
-  max-height: clamp(240px, calc(100vh - 480px), 900px);
   overflow: auto;
   font-family: Consolas, "Cascadia Mono", monospace;
   font-size: 12px;

@@ -2647,6 +2647,12 @@ input[type="checkbox"]:checked::after {
   align-items: center;
   justify-content: center;
 }
+/* 工作台空态:卡片内不再套线框盒 */
+.mcp-bench-empty .empty-state {
+  border: none;
+  background: transparent;
+  padding: 40px 0;
+}
 /* 参数 Schema 折叠块:标题行外独立展开,限高滚动 */
 .mcp-schema summary {
   cursor: default;

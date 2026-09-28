@@ -550,13 +550,15 @@ export default function McpTool() {
                         {result.is_error ? "失败" : "成功"} · {result.elapsed_ms} ms
                       </span>
                       <span style={{ flex: 1 }} />
-                      <button className="btn-text" onClick={() => setShowRaw((v) => !v)}>
-                        {showRaw ? "查看文本" : "查看原始 JSON"}
-                      </button>
-                      <CopyButton
-                        text={showRaw ? JSON.stringify(result.raw, null, 2) : result.text}
-                        label="复制结果"
-                      />
+                      <span className="mcp-acts">
+                        <button className="btn-text" onClick={() => setShowRaw((v) => !v)}>
+                          {showRaw ? "查看文本" : "查看原始 JSON"}
+                        </button>
+                        <CopyButton
+                          text={showRaw ? JSON.stringify(result.raw, null, 2) : result.text}
+                          label="复制结果"
+                        />
+                      </span>
                     </div>
                     <div className="mcp-result">
                       <pre>

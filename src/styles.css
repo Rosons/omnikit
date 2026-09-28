@@ -2627,12 +2627,15 @@ input[type="checkbox"]:checked::after {
 }
 .mcp-sec-label { font-size: 12px; font-weight: 500; color: var(--text-2); }
 .mcp-sec-row { display: flex; align-items: center; gap: 8px; }
+/* btn-text 自带 10px 左右内边距,相邻两个会叠出 28px 空隙;结果行收紧 */
+.mcp-sec-row .btn-text { padding: 6px 2px; }
 .mcp-result {
   margin: 0;
   padding: 10px 12px;
   background: var(--fill);
   border-radius: var(--radius-s);
-  max-height: 320px;
+  /* 随屏幕高度自适应:小屏保底 240px,大屏最高 900px */
+  max-height: clamp(240px, calc(100vh - 480px), 900px);
   overflow: auto;
   font-family: Consolas, "Cascadia Mono", monospace;
   font-size: 12px;
@@ -2665,7 +2668,8 @@ input[type="checkbox"]:checked::after {
   padding: 10px 12px;
   background: var(--fill);
   border-radius: var(--radius-s);
-  max-height: 180px;
+  /* 展开时随屏幕自适应(小屏保底 180px,大屏最高 700px);收起时不占空间 */
+  max-height: clamp(180px, calc(100vh - 560px), 700px);
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;

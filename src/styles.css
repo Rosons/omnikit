@@ -2646,20 +2646,8 @@ input[type="checkbox"]:checked::after {
 }
 .mcp-sec-label { font-size: 12px; font-weight: 500; color: var(--text-2); }
 .mcp-sec-row { display: flex; align-items: center; gap: 12px; }
-/* MCP 内的文本操作:纯主题色文字,无按钮感、无下划线,悬停颜色加深 */
-.mcp-bench-body .btn-text,
-.mcp-result-sec .btn-text,
-.mcp-log-modal .tool-actions .btn-text {
-  padding: 0;
-  background: none;
-}
-.mcp-bench-body .btn-text:hover,
-.mcp-result-sec .btn-text:hover,
-.mcp-log-modal .tool-actions .btn-text:hover {
-  background: none;
-  text-decoration: none;
-  color: var(--text-1);
-}
+/* 结果行相邻文字按钮内边距收紧,避免叠出大空隙 */
+.mcp-result-sec .btn-text { padding: 6px 6px; }
 .mcp-result {
   flex: 1;
   min-height: 0;

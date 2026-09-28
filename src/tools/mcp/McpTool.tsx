@@ -535,7 +535,7 @@ export default function McpTool() {
                       <pre className="mcp-log-pre">{schemaText || "（无）"}</pre>
                       <div className="tool-actions">
                         <CopyButton text={schemaText} label="复制" />
-                        <button className="btn-text" onClick={() => setSchemaOpen(false)}>
+                        <button className="btn btn-sm" onClick={() => setSchemaOpen(false)}>
                           关闭
                         </button>
                       </div>
@@ -604,10 +604,10 @@ export default function McpTool() {
             </pre>
             <div className="tool-actions">
               <CopyButton text={log.join("\n")} label="复制全部" />
-              <button className="btn-text" onClick={refreshLog}>
+              <button className="btn btn-sm" onClick={refreshLog}>
                 刷新
               </button>
-              <button className="btn-text" onClick={() => setLogOpen(false)}>
+              <button className="btn btn-sm" onClick={() => setLogOpen(false)}>
                 关闭
               </button>
             </div>

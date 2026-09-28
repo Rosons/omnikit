@@ -127,6 +127,8 @@ export default function McpTool() {
   // 左栏页签与工具筛选(工具一多时靠筛选快速定位)
   const [tab, setTab] = useState<"tools" | "resources" | "prompts">("tools");
   const [toolQ, setToolQ] = useState("");
+  // JSON-RPC 日志弹窗(低频场景:排协议问题时才看)
+  const [logOpen, setLogOpen] = useState(false);
 
   useEffect(() => {
     // 首次进入自动填上次用过的服务器
@@ -487,24 +489,7 @@ export default function McpTool() {
             {sel ? (
               <>
                 <div className="field">
-                  <span className="field-label">
-                    调用「{sel.name}」
-                    <details className="mcp-inline">
-                      <summary>
-                        参数 Schema
-                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
-                          <path
-                            d="M2 3.5L5 6.5L8 3.5"
-                            stroke="currentColor"
-                            strokeWidth="1.4"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </summary>
-                      <pre>{schemaText || "（无）"}</pre>
-                    </details>
-                  </span>
+                  <span className="field-label">调用「{sel.name}」</span>
                   <textarea
                     className="textarea input-mono"
                     style={{ height: 140 }}
@@ -513,6 +498,10 @@ export default function McpTool() {
                     placeholder="工具参数 JSON"
                     spellCheck={false}
                   />
+                  <details className="mcp-schema">
+                    <summary>参数 Schema</summary>
+                    <pre>{schemaText || "（无）"}</pre>
+                  </details>
                   <div className="tool-actions">
                     <button className="btn btn-primary" onClick={call} disabled={calling}>
                       {calling ? "调用中…" : "发送调用"}
@@ -559,10 +548,36 @@ export default function McpTool() {
       )}
 
       {info && (
-        <details className="mcp-log">
-          <summary onClick={refreshLog}>JSON-RPC 收发日志（点击展开并刷新）</summary>
-          <pre>{log.length ? log.join("\n") : "暂无记录"}</pre>
-        </details>
+        <div className="tool-actions">
+          <button
+            className="btn btn-sm"
+            onClick={() => {
+              refreshLog();
+              setLogOpen(true);
+            }}
+          >
+            JSON-RPC 日志
+          </button>
+          <span className="hint">排查协议问题时查看原始收发帧，低频功能</span>
+        </div>
+      )}
+
+      {logOpen && (
+        <div className="modal-mask open" onClick={() => setLogOpen(false)}>
+          <div className="mcp-log-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="qr-modal-title">JSON-RPC 收发日志{log.length ? `（${log.length} 条）` : ""}</div>
+            <pre className="mcp-log-pre">{log.length ? log.join("\n") : "暂无记录"}</pre>
+            <div className="tool-actions">
+              <CopyButton text={log.join("\n")} label="复制全部" />
+              <button className="btn btn-sm" onClick={refreshLog}>
+                刷新
+              </button>
+              <button className="btn btn-sm" onClick={() => setLogOpen(false)}>
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="hint">

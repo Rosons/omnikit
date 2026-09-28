@@ -413,41 +413,43 @@ export default function McpTool() {
 
       {tools && (
         <div className="mcp-work">
-          {/* 左侧:能力导航(整行可点,两行式条目) */}
+          {/* 左侧:能力导航(整行可点,两行式条目);页签收进卡片头,与右侧工作台盒顶对齐 */}
           <aside className="mcp-side">
-            <div className="diff-opts">
-              <button
-                className={`opt-chip${tab === "tools" ? " on" : ""}`}
-                onClick={() => setTab("tools")}
-              >
-                工具 {tools.length}
-              </button>
-              {resources.length > 0 && (
+            <div className="mcp-side-head">
+              <div className="diff-opts">
                 <button
-                  className={`opt-chip${tab === "resources" ? " on" : ""}`}
-                  onClick={() => setTab("resources")}
+                  className={`opt-chip${tab === "tools" ? " on" : ""}`}
+                  onClick={() => setTab("tools")}
                 >
-                  资源 {resources.length}
+                  工具 {tools.length}
                 </button>
-              )}
-              {prompts.length > 0 && (
-                <button
-                  className={`opt-chip${tab === "prompts" ? " on" : ""}`}
-                  onClick={() => setTab("prompts")}
-                >
-                  提示 {prompts.length}
-                </button>
+                {resources.length > 0 && (
+                  <button
+                    className={`opt-chip${tab === "resources" ? " on" : ""}`}
+                    onClick={() => setTab("resources")}
+                  >
+                    资源 {resources.length}
+                  </button>
+                )}
+                {prompts.length > 0 && (
+                  <button
+                    className={`opt-chip${tab === "prompts" ? " on" : ""}`}
+                    onClick={() => setTab("prompts")}
+                  >
+                    提示 {prompts.length}
+                  </button>
+                )}
+              </div>
+              {tab === "tools" && tools.length > 8 && (
+                <input
+                  className="input input-sm"
+                  value={toolQ}
+                  onChange={(e) => setToolQ(e.target.value)}
+                  placeholder="筛选工具名称或描述"
+                  spellCheck={false}
+                />
               )}
             </div>
-            {tab === "tools" && tools.length > 8 && (
-              <input
-                className="input input-sm"
-                value={toolQ}
-                onChange={(e) => setToolQ(e.target.value)}
-                placeholder="筛选工具名称或描述"
-                spellCheck={false}
-              />
-            )}
             <div className="mcp-nav">
               {tab === "tools" &&
                 (filteredTools?.length ? (

@@ -2519,14 +2519,27 @@ input[type="checkbox"]:checked::after {
   height: calc(100vh - 330px);
   min-height: 440px;
 }
-.mcp-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.mcp-side {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* 卡片头:页签与筛选框,带底分隔线,让左卡片与右工作台盒顶齐平 */
+.mcp-side-head {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
 .mcp-nav {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-m);
-  background: var(--card);
   padding: 6px;
   display: flex;
   flex-direction: column;

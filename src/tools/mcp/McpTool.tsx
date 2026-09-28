@@ -108,6 +108,29 @@ function templateFromSchema(schema: unknown): string {
   return JSON.stringify(gen((schema ?? {}) as Record<string, unknown>) ?? {}, null, 2);
 }
 
+/** 把一行日志(→/← 开头 + JSON)格式化为「分隔行 + 缩进 JSON」;
+ *  备注行([sse] 等)与非 JSON 内容原样保留 */
+function fmtLogLine(line: string): string {
+  const dir = line.startsWith("->") ? "发送" : line.startsWith("<-") ? "接收" : null;
+  if (!dir) return line;
+  const body = line.slice(2).trim();
+  try {
+    const v = JSON.parse(body) as Record<string, unknown>;
+    let pretty = JSON.stringify(v, null, 2);
+    if (pretty.length > 3000) pretty = `${pretty.slice(0, 3000)}\n…（超出部分已截断）`;
+    const what =
+      typeof v.method === "string"
+        ? String(v.method)
+        : v.error !== undefined
+          ? "错误应答"
+          : "结果";
+    return `── ${dir} · ${what} ──\n${pretty}`;
+  } catch {
+    // 大帧尾部被截断等情况:原样展示
+    return line;
+  }
+}
+
 export default function McpTool() {
   const [kind, setKind] = useState<Kind>("stdio");
   const [target, setTarget] = useState("");
@@ -230,6 +253,8 @@ export default function McpTool() {
         argsJson: JSON.stringify(parsed),
       });
       setResult(r);
+      // 文本内容为空时直接看原始 JSON,省一次手动切换
+      setShowRaw(r.text.trim() === "");
       refreshLog();
     } catch (e) {
       invoke("log_append", {
@@ -566,7 +591,9 @@ export default function McpTool() {
         <div className="modal-mask open" onClick={() => setLogOpen(false)}>
           <div className="mcp-log-modal" onClick={(e) => e.stopPropagation()}>
             <div className="qr-modal-title">JSON-RPC 收发日志{log.length ? `（${log.length} 条）` : ""}</div>
-            <pre className="mcp-log-pre">{log.length ? log.join("\n") : "暂无记录"}</pre>
+            <pre className="mcp-log-pre">
+              {log.length ? log.map(fmtLogLine).join("\n\n") : "暂无记录"}
+            </pre>
             <div className="tool-actions">
               <CopyButton text={log.join("\n")} label="复制全部" />
               <button className="btn btn-sm" onClick={refreshLog}>

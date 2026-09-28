@@ -67,8 +67,10 @@ pub enum McpSession {
 }
 
 fn push_log(log: &Mutex<Vec<String>>, mut line: String) {
-    if line.len() > 2000 {
-        let mut cut = 2000;
+    // 16KB 单帧上限:给前端 JSON 格式化留余地(2000 会把大帧拦腰截断没法解析),
+    // 内存上限 200 条 × 16KB 仍可控
+    if line.len() > 16384 {
+        let mut cut = 16384;
         while !line.is_char_boundary(cut) {
             cut -= 1;
         }

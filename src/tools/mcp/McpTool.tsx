@@ -509,15 +509,21 @@ export default function McpTool() {
             </div>
           </div>
 
-          {/* 右栏:调用区常驻,选中工具立即在这里出现 */}
+          {/* 右栏:参数卡 + 结果卡,职责分开 */}
           <div className="mcp-right">
             {sel ? (
               <>
-                <div className="field">
-                  <span className="field-label">调用「{sel.name}」</span>
+                <div className="mcp-panel">
+                  <div className="mcp-panel-head">
+                    <span className="mcp-panel-title">调用「{sel.name}」</span>
+                    <span style={{ flex: 1 }} />
+                    <button className="btn-text" onClick={() => setSel(null)}>
+                      关闭
+                    </button>
+                  </div>
                   <textarea
                     className="textarea input-mono"
-                    style={{ height: 140 }}
+                    style={{ height: 160 }}
                     value={args}
                     onChange={(e) => setArgs(e.target.value)}
                     placeholder="工具参数 JSON"
@@ -527,23 +533,21 @@ export default function McpTool() {
                     <summary>参数 Schema</summary>
                     <pre>{schemaText || "（无）"}</pre>
                   </details>
-                  <div className="tool-actions">
+                  <div className="mcp-panel-foot">
                     <button className="btn btn-primary" onClick={call} disabled={calling}>
                       {calling ? "调用中…" : "发送调用"}
-                    </button>
-                    <button className="btn" onClick={() => setSel(null)}>
-                      关闭
                     </button>
                   </div>
                 </div>
 
                 {result && (
-                  <div className="field">
-                    <span className="field-label">
-                      调用结果
+                  <div className="mcp-panel">
+                    <div className="mcp-panel-head">
+                      <span className="mcp-panel-title">调用结果</span>
                       <span className={`jwt-chip ${result.is_error ? "expired" : "valid"}`}>
                         {result.is_error ? "失败" : "成功"} · {result.elapsed_ms} ms
                       </span>
+                      <span style={{ flex: 1 }} />
                       <button className="btn-text" onClick={() => setShowRaw((v) => !v)}>
                         {showRaw ? "查看文本" : "查看原始 JSON"}
                       </button>
@@ -551,7 +555,7 @@ export default function McpTool() {
                         text={showRaw ? JSON.stringify(result.raw, null, 2) : result.text}
                         label="复制结果"
                       />
-                    </span>
+                    </div>
                     <div className="sql-out mcp-out">
                       <pre>
                         {showRaw
@@ -563,9 +567,11 @@ export default function McpTool() {
                 )}
               </>
             ) : (
-              <div className="empty-state">
-                <div className="empty-title">在左侧选一个工具</div>
-                <div className="hint">点「调用」后参数模板会填到这里，发送后结果也在下方</div>
+              <div className="mcp-panel mcp-panel-empty">
+                <div className="empty-state">
+                  <div className="empty-title">在左侧选一个工具</div>
+                  <div className="hint">点「调用」后参数模板会填到这里，发送后结果出现在下一张卡片</div>
+                </div>
               </div>
             )}
           </div>

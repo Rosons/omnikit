@@ -2530,15 +2530,28 @@ input[type="checkbox"]:checked::after {
   white-space: nowrap;
   font-family: Consolas, "Cascadia Mono", monospace;
 }
-/* 右栏调用区包成卡片,与左栏列表的卡片观感对等 */
+/* 右栏:参数卡 + 结果卡两张面板 */
 .mcp-right {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mcp-panel {
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
   background: var(--card);
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-.mcp-right .empty-state { padding: 28px 0; }
+.mcp-panel-head { display: flex; align-items: center; gap: 8px; }
+.mcp-panel-title { font-size: 12.5px; font-weight: 600; color: var(--text-1); }
+.mcp-panel-foot { display: flex; justify-content: flex-end; gap: 8px; }
+.mcp-panel-empty { align-items: center; justify-content: center; }
+.mcp-panel-empty .empty-state { padding: 26px 0; }
 .mcp-out { max-height: 320px; overflow: auto; }
 /* 参数 Schema 折叠块:标题行外独立展开,限高滚动 */
 .mcp-schema summary {

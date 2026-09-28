@@ -567,6 +567,7 @@ export default function McpTool() {
         <div className="tool-actions">
           <button
             className="btn btn-sm"
+            title="查看原始 JSON-RPC 收发帧"
             onClick={() => {
               refreshLog();
               setLogOpen(true);
@@ -574,7 +575,6 @@ export default function McpTool() {
           >
             JSON-RPC 日志
           </button>
-          <span className="hint">排查协议问题时查看原始收发帧，低频功能</span>
         </div>
       )}
 
@@ -597,10 +597,6 @@ export default function McpTool() {
           </div>
         </div>
       )}
-
-      <div className="hint">
-        本地命令传输支持带引号的启动命令，断开或退出应用时自动结束子进程；远程使用 Streamable HTTP（2025-06-18 规范），需要鉴权时添加请求头；连接成功的服务器会自动记住，下次一键填入
-      </div>
     </div>
   );
 }

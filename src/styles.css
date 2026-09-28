@@ -2511,13 +2511,14 @@ input[type="checkbox"]:checked::after {
   flex: none;
 }
 
-/* ===== MCP 调试工作台:左能力导航 + 右调用台,占满一屏高、各自内部滚动 ===== */
+/* ===== MCP 调试工作台:页面占满可用高(不出页面滚动条),左能力导航 + 右调用台 ===== */
+.mcp-page { height: 100%; }
 .mcp-work {
+  flex: 1;
+  min-height: 320px;
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
   gap: 14px;
-  height: calc(100vh - 330px);
-  min-height: 440px;
 }
 .mcp-side {
   min-width: 0;
@@ -2625,6 +2626,12 @@ input[type="checkbox"]:checked::after {
   flex-direction: column;
   gap: 10px;
 }
+/* 参数编辑器填满所在分区,不再留底部空白 */
+.mcp-args {
+  flex: 1;
+  min-height: 140px;
+  resize: none;
+}
 /* 结果区固定占工作台下部,与参数区各自滚动;有结果才出现 */
 .mcp-result-sec {
   flex: 1 1 45%;
@@ -2668,27 +2675,7 @@ input[type="checkbox"]:checked::after {
   padding: 40px 0;
 }
 /* 参数 Schema 折叠块:标题行外独立展开,限高滚动 */
-.mcp-schema summary {
-  cursor: default;
-  color: var(--text-2);
-  font-size: 12px;
-  user-select: none;
-}
-.mcp-schema pre {
-  margin: 8px 0 0;
-  padding: 10px 12px;
-  background: var(--fill);
-  border-radius: var(--radius-s);
-  /* 展开时随屏幕自适应(小屏保底 180px,大屏最高 700px);收起时不占空间 */
-  max-height: clamp(180px, calc(100vh - 560px), 700px);
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: Consolas, "Cascadia Mono", monospace;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--text-2);
-}
+/* 参数 Schema 弹窗复用 .mcp-log-modal,无独立样式 */
 
 /* MCP 服务器使用说明:默认折叠,展开后限高滚动;缩进与 JSON-RPC 日志卡片的 12px 对齐 */
 .mcp-instructions summary {

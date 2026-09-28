@@ -150,8 +150,10 @@ export default function McpTool() {
   // 左栏页签与工具筛选(工具一多时靠筛选快速定位)
   const [tab, setTab] = useState<"tools" | "resources" | "prompts">("tools");
   const [toolQ, setToolQ] = useState("");
-  // JSON-RPC 日志弹窗(低频场景:排协议问题时才看)
+  // JSON-RPC 日志弹窗(排协议问题时查看原始收发帧)
   const [logOpen, setLogOpen] = useState(false);
+  // 参数 Schema 弹窗
+  const [schemaOpen, setSchemaOpen] = useState(false);
 
   useEffect(() => {
     // 首次进入自动填上次用过的服务器
@@ -270,15 +272,12 @@ export default function McpTool() {
   }
 
   const schemaText = sel ? JSON.stringify(sel.schema, null, 2) : "";
-  // 参数框按内容行数自适应高度,不再留大片空白
-  const argsLines = args ? args.split("\n").length : 1;
-  const argsHeight = Math.min(320, Math.max(96, 16 + argsLines * 18));
   const filteredTools = tools?.filter((t) =>
     (t.name + (t.description ?? "")).toLowerCase().includes(toolQ.trim().toLowerCase()),
   );
 
   return (
-    <div className="stack">
+    <div className="stack mcp-page">
       <div className="field">
         <span className="field-label">连接方式</span>
         <div className="tool-actions">
@@ -514,20 +513,35 @@ export default function McpTool() {
                   </button>
                 </header>
                 <div className="mcp-bench-body">
-                  <span className="mcp-sec-label">参数</span>
+                  <div className="mcp-sec-row">
+                    <span className="mcp-sec-label">参数</span>
+                    <span style={{ flex: 1 }} />
+                    <button className="btn-text" onClick={() => setSchemaOpen(true)}>
+                      参数 Schema
+                    </button>
+                  </div>
                   <textarea
-                    className="textarea input-mono"
-                    style={{ height: argsHeight }}
+                    className="textarea input-mono mcp-args"
                     value={args}
                     onChange={(e) => setArgs(e.target.value)}
                     placeholder="工具参数 JSON"
                     spellCheck={false}
                   />
-                  <details className="mcp-schema">
-                    <summary>参数 Schema</summary>
-                    <pre>{schemaText || "（无）"}</pre>
-                  </details>
                 </div>
+                {schemaOpen && (
+                  <div className="modal-mask open" onClick={() => setSchemaOpen(false)}>
+                    <div className="mcp-log-modal" onClick={(e) => e.stopPropagation()}>
+                      <div className="qr-modal-title">参数 Schema · {sel.name}</div>
+                      <pre className="mcp-log-pre">{schemaText || "（无）"}</pre>
+                      <div className="tool-actions">
+                        <CopyButton text={schemaText} label="复制" />
+                        <button className="btn btn-sm" onClick={() => setSchemaOpen(false)}>
+                          关闭
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {result && (
                   <div className="mcp-result-sec">
                     <div className="mcp-sec-row">

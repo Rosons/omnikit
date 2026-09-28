@@ -412,10 +412,10 @@ export default function McpTool() {
       )}
 
       {tools && (
-        <div className="mcp-grid">
-          {/* 左栏:工具/资源/提示 列表,内部滚动 */}
-          <div className="mcp-left">
-            <div className="diff-opts mcp-tabs">
+        <div className="mcp-work">
+          {/* 左侧:能力导航(整行可点,两行式条目) */}
+          <aside className="mcp-side">
+            <div className="diff-opts">
               <button
                 className={`opt-chip${tab === "tools" ? " on" : ""}`}
                 onClick={() => setTab("tools")}
@@ -448,82 +448,71 @@ export default function McpTool() {
                 spellCheck={false}
               />
             )}
-            <div className="kv-list mcp-list">
+            <div className="mcp-nav">
               {tab === "tools" &&
                 (filteredTools?.length ? (
                   filteredTools.map((t) => (
-                    <div
-                      className={`kv-row${sel?.name === t.name ? " mcp-sel" : ""}`}
+                    <button
+                      className={`mcp-item${sel?.name === t.name ? " sel" : ""}`}
                       key={t.name}
+                      onClick={() => pickTool(t)}
+                      title={t.description ?? ""}
                     >
-                      <span className="kv-k mcp-name" title={t.name}>
-                        {t.name}
-                      </span>
-                      <span className="mcp-desc" title={t.description ?? ""}>
-                        {t.description ?? ""}
-                      </span>
-                      <button className="btn-text" onClick={() => pickTool(t)}>
-                        调用
-                      </button>
-                    </div>
+                      <span className="mcp-item-name">{t.name}</span>
+                      <span className="mcp-item-desc">{t.description || "（无描述）"}</span>
+                    </button>
                   ))
                 ) : (
-                  <div className="kv-row">
-                    <span className="hint">
-                      {tools.length === 0 ? "服务器没有暴露任何工具" : "没有匹配的工具"}
-                    </span>
+                  <div className="mcp-nav-empty hint">
+                    {tools.length === 0 ? "服务器没有暴露任何工具" : "没有匹配的工具"}
                   </div>
                 ))}
               {tab === "resources" &&
                 (resources.length ? (
                   resources.map((r) => (
-                    <div className="kv-row" key={r.uri}>
-                      <span className="kv-k mcp-name" title={r.uri}>
-                        {r.name ?? r.uri}
-                      </span>
-                      <span className="mcp-desc" title={r.description ?? ""}>
+                    <div className="mcp-item static" key={r.uri} title={r.uri}>
+                      <span className="mcp-item-name">{r.name ?? r.uri}</span>
+                      <span className="mcp-item-desc">
                         {r.mime_type ? `${r.mime_type} · ` : ""}
                         {r.uri}
                       </span>
                     </div>
                   ))
                 ) : (
-                  <div className="kv-row">
-                    <span className="hint">服务器没有暴露资源</span>
-                  </div>
+                  <div className="mcp-nav-empty hint">服务器没有暴露资源</div>
                 ))}
-              {tab === "prompts" && (
-                <>
-                  {prompts.map((p) => (
-                    <div className="kv-row" key={p.name}>
-                      <span className="kv-k mcp-name" title={p.name}>
-                        {p.name}
-                      </span>
-                      <span className="mcp-desc" title={p.description ?? ""}>
-                        {p.description ?? ""}
-                      </span>
+              {tab === "prompts" &&
+                (prompts.length ? (
+                  prompts.map((p) => (
+                    <div className="mcp-item static" key={p.name}>
+                      <span className="mcp-item-name">{p.name}</span>
+                      <span className="mcp-item-desc">{p.description || "（无描述）"}</span>
                     </div>
-                  ))}
-                </>
-              )}
+                  ))
+                ) : (
+                  <div className="mcp-nav-empty hint">服务器没有暴露提示模板</div>
+                ))}
             </div>
-          </div>
+          </aside>
 
-          {/* 右栏:参数卡 + 结果卡,职责分开 */}
-          <div className="mcp-right">
+          {/* 右侧:调用工作台(顶部工具条常驻,内容区滚动) */}
+          <section className="mcp-bench">
             {sel ? (
               <>
-                <div className="mcp-panel">
-                  <div className="mcp-panel-head">
-                    <span className="mcp-panel-title">调用「{sel.name}」</span>
-                    <span style={{ flex: 1 }} />
-                    <button className="btn-text" onClick={() => setSel(null)}>
-                      关闭
-                    </button>
+                <header className="mcp-bench-head">
+                  <div className="mcp-bench-title">
+                    <span className="mcp-bench-name">{sel.name}</span>
+                    {sel.description && <span className="mcp-bench-desc">{sel.description}</span>}
                   </div>
+                  <button className="btn btn-primary btn-sm" onClick={call} disabled={calling}>
+                    {calling ? "调用中…" : "发送调用"}
+                  </button>
+                </header>
+                <div className="mcp-bench-body">
+                  <span className="mcp-sec-label">参数</span>
                   <textarea
                     className="textarea input-mono"
-                    style={{ height: 160 }}
+                    style={{ height: 150 }}
                     value={args}
                     onChange={(e) => setArgs(e.target.value)}
                     placeholder="工具参数 JSON"
@@ -533,48 +522,42 @@ export default function McpTool() {
                     <summary>参数 Schema</summary>
                     <pre>{schemaText || "（无）"}</pre>
                   </details>
-                  <div className="mcp-panel-foot">
-                    <button className="btn btn-primary" onClick={call} disabled={calling}>
-                      {calling ? "调用中…" : "发送调用"}
-                    </button>
-                  </div>
+                  {result && (
+                    <>
+                      <div className="mcp-sec-row">
+                        <span className="mcp-sec-label">结果</span>
+                        <span className={`jwt-chip ${result.is_error ? "expired" : "valid"}`}>
+                          {result.is_error ? "失败" : "成功"} · {result.elapsed_ms} ms
+                        </span>
+                        <span style={{ flex: 1 }} />
+                        <button className="btn-text" onClick={() => setShowRaw((v) => !v)}>
+                          {showRaw ? "查看文本" : "查看原始 JSON"}
+                        </button>
+                        <CopyButton
+                          text={showRaw ? JSON.stringify(result.raw, null, 2) : result.text}
+                          label="复制结果"
+                        />
+                      </div>
+                      <div className="mcp-result">
+                        <pre>
+                          {showRaw
+                            ? JSON.stringify(result.raw, null, 2)
+                            : result.text || "（无文本内容）"}
+                        </pre>
+                      </div>
+                    </>
+                  )}
                 </div>
-
-                {result && (
-                  <div className="mcp-panel">
-                    <div className="mcp-panel-head">
-                      <span className="mcp-panel-title">调用结果</span>
-                      <span className={`jwt-chip ${result.is_error ? "expired" : "valid"}`}>
-                        {result.is_error ? "失败" : "成功"} · {result.elapsed_ms} ms
-                      </span>
-                      <span style={{ flex: 1 }} />
-                      <button className="btn-text" onClick={() => setShowRaw((v) => !v)}>
-                        {showRaw ? "查看文本" : "查看原始 JSON"}
-                      </button>
-                      <CopyButton
-                        text={showRaw ? JSON.stringify(result.raw, null, 2) : result.text}
-                        label="复制结果"
-                      />
-                    </div>
-                    <div className="sql-out mcp-out">
-                      <pre>
-                        {showRaw
-                          ? JSON.stringify(result.raw, null, 2)
-                          : result.text || "（无文本内容）"}
-                      </pre>
-                    </div>
-                  </div>
-                )}
               </>
             ) : (
-              <div className="mcp-panel mcp-panel-empty">
+              <div className="mcp-bench-empty">
                 <div className="empty-state">
                   <div className="empty-title">在左侧选一个工具</div>
-                  <div className="hint">点「调用」后参数模板会填到这里，发送后结果出现在下一张卡片</div>
+                  <div className="hint">点中条目后，参数模板会填到这里，发送后结果显示在下方</div>
                 </div>
               </div>
             )}
-          </div>
+          </section>
         </div>
       )}
 

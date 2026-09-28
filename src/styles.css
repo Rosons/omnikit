@@ -2511,48 +2511,129 @@ input[type="checkbox"]:checked::after {
   flex: none;
 }
 
-/* ===== MCP 测试:左右分栏,调用区常驻右侧 ===== */
-.mcp-grid {
+/* ===== MCP 调试工作台:左能力导航 + 右调用台,占满一屏高、各自内部滚动 ===== */
+.mcp-work {
   display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
-  gap: var(--sp-4);
-  align-items: start;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 14px;
+  height: calc(100vh - 330px);
+  min-height: 440px;
 }
-.mcp-left { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.mcp-tabs { margin-bottom: 0; }
-.mcp-list { max-height: 420px; overflow-y: auto; }
-.mcp-name {
-  min-width: 0;
-  flex: none;
-  max-width: 45%;
+.mcp-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.mcp-nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mcp-nav-empty { padding: 14px 10px; }
+.mcp-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius-s);
+  background: transparent;
+  cursor: pointer;
+  transition: background var(--fast);
+}
+.mcp-item:hover { background: var(--fill-2); }
+.mcp-item.sel,
+.mcp-item.sel:hover { background: var(--primary-dim); }
+.mcp-item.static { cursor: default; }
+.mcp-item.static:hover { background: transparent; }
+.mcp-item-name {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: Consolas, "Cascadia Mono", monospace;
 }
-/* 右栏:参数卡 + 结果卡两张面板 */
-.mcp-right {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.mcp-item.sel .mcp-item-name { color: var(--primary); }
+.mcp-item-desc {
+  font-size: 11.5px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.mcp-panel {
+.mcp-bench {
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
   background: var(--card);
-  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.mcp-bench-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.mcp-bench-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mcp-bench-name {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.mcp-bench-desc {
+  font-size: 11.5px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mcp-bench-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.mcp-panel-head { display: flex; align-items: center; gap: 8px; }
-.mcp-panel-title { font-size: 12.5px; font-weight: 600; color: var(--text-1); }
-.mcp-panel-foot { display: flex; justify-content: flex-end; gap: 8px; }
-.mcp-panel-empty { align-items: center; justify-content: center; }
-.mcp-panel-empty .empty-state { padding: 26px 0; }
-.mcp-out { max-height: 320px; overflow: auto; }
+.mcp-sec-label { font-size: 12px; font-weight: 500; color: var(--text-2); }
+.mcp-sec-row { display: flex; align-items: center; gap: 8px; }
+.mcp-result {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--fill);
+  border-radius: var(--radius-s);
+  max-height: 320px;
+  overflow: auto;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.mcp-bench-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 /* 参数 Schema 折叠块:标题行外独立展开,限高滚动 */
 .mcp-schema summary {
   cursor: default;

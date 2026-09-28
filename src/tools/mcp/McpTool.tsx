@@ -7,7 +7,6 @@ import Dropdown from "../../components/Dropdown";
 const KINDS = [
   { id: "stdio", label: "本地命令" },
   { id: "http", label: "Streamable HTTP" },
-  { id: "sse", label: "HTTP+SSE 旧版" },
 ] as const;
 type Kind = (typeof KINDS)[number]["id"];
 
@@ -22,7 +21,9 @@ interface SavedServer {
 function loadServers(): SavedServer[] {
   try {
     const arr = JSON.parse(localStorage.getItem(SERVERS_KEY) ?? "[]");
-    return Array.isArray(arr) ? arr : [];
+    if (!Array.isArray(arr)) return [];
+    // 旧版本保存过 SSE 服务器,入口已移除,加载时过滤掉
+    return arr.filter((x) => x && x.kind !== "sse");
   } catch {
     return [];
   }
@@ -122,7 +123,10 @@ export default function McpTool() {
   const [result, setResult] = useState<McpCallResult | null>(null);
   const [showRaw, setShowRaw] = useState(false);
   const [log, setLog] = useState<string[]>([]);
-  const [servers, setServers] = useState<SavedServer[]>(loadServers);
+  const [servers, setServers] = useState<SavedServer[]>(() => loadServers());
+  // 左栏页签与工具筛选(工具一多时靠筛选快速定位)
+  const [tab, setTab] = useState<"tools" | "resources" | "prompts">("tools");
+  const [toolQ, setToolQ] = useState("");
 
   useEffect(() => {
     // 首次进入自动填上次用过的服务器
@@ -239,6 +243,9 @@ export default function McpTool() {
   }
 
   const schemaText = sel ? JSON.stringify(sel.schema, null, 2) : "";
+  const filteredTools = tools?.filter((t) =>
+    (t.name + (t.description ?? "")).toLowerCase().includes(toolQ.trim().toLowerCase()),
+  );
 
   return (
     <div className="stack">
@@ -263,9 +270,7 @@ export default function McpTool() {
             placeholder={
               kind === "stdio"
                 ? "如 npx -y @modelcontextprotocol/server-everything"
-                : kind === "sse"
-                  ? "如 https://example.com/sse"
-                  : "如 https://example.com/mcp"
+                : "如 https://example.com/mcp"
             }
             spellCheck={false}
           />
@@ -379,128 +384,175 @@ export default function McpTool() {
       )}
 
       {tools && (
-        <div className="field">
-          <span className="field-label">工具（{tools.length}）</span>
-          <div className="kv-list">
-            {tools.length === 0 && (
-              <div className="kv-row">
-                <span className="hint">服务器没有暴露任何工具</span>
+        <div className="mcp-grid">
+          {/* 左栏:工具/资源/提示 列表,内部滚动 */}
+          <div className="mcp-left">
+            <div className="diff-opts mcp-tabs">
+              <button
+                className={`opt-chip${tab === "tools" ? " on" : ""}`}
+                onClick={() => setTab("tools")}
+              >
+                工具 {tools.length}
+              </button>
+              {resources.length > 0 && (
+                <button
+                  className={`opt-chip${tab === "resources" ? " on" : ""}`}
+                  onClick={() => setTab("resources")}
+                >
+                  资源 {resources.length}
+                </button>
+              )}
+              {prompts.length > 0 && (
+                <button
+                  className={`opt-chip${tab === "prompts" ? " on" : ""}`}
+                  onClick={() => setTab("prompts")}
+                >
+                  提示 {prompts.length}
+                </button>
+              )}
+            </div>
+            {tab === "tools" && tools.length > 8 && (
+              <input
+                className="input input-sm"
+                value={toolQ}
+                onChange={(e) => setToolQ(e.target.value)}
+                placeholder="筛选工具名称或描述"
+                spellCheck={false}
+              />
+            )}
+            <div className="kv-list mcp-list">
+              {tab === "tools" &&
+                (filteredTools?.length ? (
+                  filteredTools.map((t) => (
+                    <div
+                      className={`kv-row${sel?.name === t.name ? " mcp-sel" : ""}`}
+                      key={t.name}
+                    >
+                      <span className="kv-k mcp-name" title={t.name}>
+                        {t.name}
+                      </span>
+                      <span className="mcp-desc" title={t.description ?? ""}>
+                        {t.description ?? ""}
+                      </span>
+                      <button className="btn-text" onClick={() => pickTool(t)}>
+                        调用
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="kv-row">
+                    <span className="hint">
+                      {tools.length === 0 ? "服务器没有暴露任何工具" : "没有匹配的工具"}
+                    </span>
+                  </div>
+                ))}
+              {tab === "resources" &&
+                (resources.length ? (
+                  resources.map((r) => (
+                    <div className="kv-row" key={r.uri}>
+                      <span className="kv-k mcp-name" title={r.uri}>
+                        {r.name ?? r.uri}
+                      </span>
+                      <span className="mcp-desc" title={r.description ?? ""}>
+                        {r.mime_type ? `${r.mime_type} · ` : ""}
+                        {r.uri}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="kv-row">
+                    <span className="hint">服务器没有暴露资源</span>
+                  </div>
+                ))}
+              {tab === "prompts" && (
+                <>
+                  {prompts.map((p) => (
+                    <div className="kv-row" key={p.name}>
+                      <span className="kv-k mcp-name" title={p.name}>
+                        {p.name}
+                      </span>
+                      <span className="mcp-desc" title={p.description ?? ""}>
+                        {p.description ?? ""}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* 右栏:调用区常驻,选中工具立即在这里出现 */}
+          <div className="mcp-right">
+            {sel ? (
+              <>
+                <div className="field">
+                  <span className="field-label">
+                    调用「{sel.name}」
+                    <details className="mcp-inline">
+                      <summary>
+                        参数 Schema
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+                          <path
+                            d="M2 3.5L5 6.5L8 3.5"
+                            stroke="currentColor"
+                            strokeWidth="1.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </summary>
+                      <pre>{schemaText || "（无）"}</pre>
+                    </details>
+                  </span>
+                  <textarea
+                    className="textarea input-mono"
+                    style={{ height: 140 }}
+                    value={args}
+                    onChange={(e) => setArgs(e.target.value)}
+                    placeholder="工具参数 JSON"
+                    spellCheck={false}
+                  />
+                  <div className="tool-actions">
+                    <button className="btn btn-primary" onClick={call} disabled={calling}>
+                      {calling ? "调用中…" : "发送调用"}
+                    </button>
+                    <button className="btn" onClick={() => setSel(null)}>
+                      关闭
+                    </button>
+                  </div>
+                </div>
+
+                {result && (
+                  <div className="field">
+                    <span className="field-label">
+                      调用结果
+                      <span className={`jwt-chip ${result.is_error ? "expired" : "valid"}`}>
+                        {result.is_error ? "失败" : "成功"} · {result.elapsed_ms} ms
+                      </span>
+                      <button className="btn-text" onClick={() => setShowRaw((v) => !v)}>
+                        {showRaw ? "查看文本" : "查看原始 JSON"}
+                      </button>
+                      <CopyButton
+                        text={showRaw ? JSON.stringify(result.raw, null, 2) : result.text}
+                        label="复制结果"
+                      />
+                    </span>
+                    <div className="sql-out mcp-out">
+                      <pre>
+                        {showRaw
+                          ? JSON.stringify(result.raw, null, 2)
+                          : result.text || "（无文本内容）"}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="empty-state">
+                <div className="empty-title">在左侧选一个工具</div>
+                <div className="hint">点「调用」后参数模板会填到这里，发送后结果也在下方</div>
               </div>
             )}
-            {tools.map((t) => (
-              <div className={`kv-row${sel?.name === t.name ? " mcp-sel" : ""}`} key={t.name}>
-                <span className="kv-k" style={{ minWidth: 120 }}>
-                  {t.name}
-                </span>
-                <span className="mcp-desc" title={t.description ?? ""}>
-                  {t.description ?? ""}
-                </span>
-                <button className="btn-text" onClick={() => pickTool(t)}>
-                  调用
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {sel && (
-        <div className="field">
-          <span className="field-label">
-            调用「{sel.name}」
-            <details className="mcp-inline">
-              <summary>
-                参数 Schema
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
-                  <path
-                    d="M2 3.5L5 6.5L8 3.5"
-                    stroke="currentColor"
-                    strokeWidth="1.4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </summary>
-              <pre>{schemaText || "（无）"}</pre>
-            </details>
-          </span>
-          <textarea
-            className="textarea input-mono"
-            style={{ height: 140 }}
-            value={args}
-            onChange={(e) => setArgs(e.target.value)}
-            placeholder="工具参数 JSON"
-            spellCheck={false}
-          />
-          <div className="tool-actions">
-            <button className="btn btn-primary" onClick={call} disabled={calling}>
-              {calling ? "调用中…" : "发送调用"}
-            </button>
-            <button className="btn" onClick={() => setSel(null)}>
-              关闭
-            </button>
-          </div>
-        </div>
-      )}
-
-      {result && (
-        <div className="field">
-          <span className="field-label">
-            调用结果
-            <span className={`jwt-chip ${result.is_error ? "expired" : "valid"}`}>
-              {result.is_error ? "失败" : "成功"} · {result.elapsed_ms} ms
-            </span>
-            <button className="btn-text" onClick={() => setShowRaw((v) => !v)}>
-              {showRaw ? "查看文本" : "查看原始 JSON"}
-            </button>
-            <CopyButton
-              text={showRaw ? JSON.stringify(result.raw, null, 2) : result.text}
-              label="复制结果"
-            />
-          </span>
-          <div className="sql-out">
-            <pre>
-              {showRaw
-                ? JSON.stringify(result.raw, null, 2)
-                : result.text || "（无文本内容）"}
-            </pre>
-          </div>
-        </div>
-      )}
-
-      {info && resources.length > 0 && (
-        <div className="field">
-          <span className="field-label">资源（{resources.length}）</span>
-          <div className="kv-list">
-            {resources.map((r) => (
-              <div className="kv-row" key={r.uri}>
-                <span className="kv-k" style={{ minWidth: 140 }}>
-                  {r.name ?? r.uri}
-                </span>
-                <span className="mcp-desc" title={r.description ?? ""}>
-                  {r.mime_type ? `${r.mime_type} · ` : ""}
-                  {r.uri}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {info && prompts.length > 0 && (
-        <div className="field">
-          <span className="field-label">提示模板（{prompts.length}）</span>
-          <div className="kv-list">
-            {prompts.map((p) => (
-              <div className="kv-row" key={p.name}>
-                <span className="kv-k" style={{ minWidth: 140 }}>
-                  {p.name}
-                </span>
-                <span className="mcp-desc" title={p.description ?? ""}>
-                  {p.description ?? ""}
-                </span>
-              </div>
-            ))}
           </div>
         </div>
       )}
@@ -513,7 +565,7 @@ export default function McpTool() {
       )}
 
       <div className="hint">
-        本地命令传输支持带引号的启动命令，断开或退出应用时自动结束子进程；远程推荐 Streamable HTTP（2025-06-18 规范），公司内网老网关或只支持 GET /sse 的服务用「HTTP+SSE 旧版」，需要鉴权时添加请求头；连接成功的服务器会自动记住，下次一键填入
+        本地命令传输支持带引号的启动命令，断开或退出应用时自动结束子进程；远程使用 Streamable HTTP（2025-06-18 规范），需要鉴权时添加请求头；连接成功的服务器会自动记住，下次一键填入
       </div>
     </div>
   );

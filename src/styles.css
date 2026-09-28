@@ -2508,3 +2508,25 @@ input[type="checkbox"]:checked::after {
   font-size: 11px;
   flex: none;
 }
+
+/* ===== MCP 测试:左右分栏,调用区常驻右侧 ===== */
+.mcp-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+.mcp-left { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.mcp-tabs { margin-bottom: 0; }
+.mcp-list { max-height: 420px; overflow-y: auto; }
+.mcp-name {
+  min-width: 0;
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: Consolas, "Cascadia Mono", monospace;
+}
+.mcp-right { min-width: 0; }
+.mcp-out { max-height: 320px; overflow: auto; }
